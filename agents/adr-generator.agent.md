@@ -41,6 +41,23 @@ govern the work; do not introduce new repository conventions implicitly.
    unless that ADR actually establishes it. Do not describe a hypothetical
    alternative as the current state without evidence, or claim files or
    implementation do not exist merely because they were not inspected.
+5. Classify material claims by evidence and lifecycle state:
+   - **Implemented capability:** verify the relevant code, configuration,
+     deployment, or runtime evidence. State what was inspected; an
+     uninspected or absent search result is not proof that something does
+     not exist.
+   - **Accepted decision:** verify the decision's current status and wording.
+     It establishes an approved direction, not proof that the direction has
+     been implemented.
+   - **Proposed design:** identify it as proposed and cite its proposal
+     source; do not report it as an approved decision or current capability.
+   - **Future possibility or open question:** keep it explicitly unresolved;
+     do not use it as an established constraint, alternative already
+     evaluated, or existing capability.
+   When evidence is incomplete or conflicting, identify what is known,
+   distinguish the sources and their status, and leave the claim unresolved.
+   Do not infer completion, non-existence, or outcome from intent or
+   intermediate process signals alone.
 
 ## Approval and changes
 
