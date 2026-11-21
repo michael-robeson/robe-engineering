@@ -1,8 +1,8 @@
 # Evaluation: ADR Generator
 
-- **Status:** evaluating; recommendation awaiting approval.
-- **Recommendation:** adapt before personal adoption. Do not install or
-  replace the existing agent yet.
+- **Status:** evaluating; personal adoption remains unapproved.
+- **Recommendation:** evaluate the adapted candidate further before personal
+  adoption. Do not install or replace the existing agent yet.
 - **Reviewed:** 2026-11-21.
 
 ## Provenance
@@ -60,28 +60,70 @@ availability to the harness. It contains no executable script, but it
 instructs the agent to create files and does not itself enforce read-only
 or approval boundaries.
 
-## Portability and next steps
+## Adapted candidate
 
 The unmodified agent cannot reliably respect varying ADR paths, numbering,
 templates, or accepted-decision boundaries: the written rules conflict with
-Robe's conventions. A single adapted agent is a plausible alternative to
-per-project copies, but its reliability is **not yet demonstrated**.
+Robe's conventions.
 
-If adaptation is approved:
+The [candidate](../agents/adr-generator.agent.md) adapts the matching
+upstream revision for repository-convention discovery, approval boundaries,
+and evidence-grounded decision analysis. Its Git blob is
+`d2d278408ded1ac17c0b226031d4f8d57a727ceb`; this content identifier is not
+the upstream commit. The upstream copyright and MIT permission notice are
+preserved in [ADR-GENERATOR-LICENSE](../agents/ADR-GENERATOR-LICENSE).
+The original downloaded agent is unchanged; the candidate is not installed.
 
-1. Discover each repository's ADR directory, template, existing numbers,
-   instruction files, and statuses before drafting. Ask when ambiguous;
-   never silently create a new ADR convention or overwrite an existing ADR.
-2. Default new proposals to Proposed, preserve accepted records, and change
-   status only on explicit authorization. Treat open choices as open and
-   never invent rationale, stakeholders, or metrics to fill a checklist.
-3. Use the existing template and naming rules; retain the upstream checklist
-   as optional guidance rather than fixed section or item counts. Review
-   effective tool access and require authorization for any file changes.
-4. Verify with fresh sessions in multiple repositories, including conflicting
-   templates, missing ADR conventions, existing accepted records, and
-   explicit status instructions. Confirm discovery and inspect actual output
-   and tool calls before adoption.
+## Behavioral validation: 2026-11-21
+
+These are actual, separate Copilot CLI 1.0.114 prompt-mode sessions, not
+static simulations. Each used `--agent portable-adr-generator` with a
+session-only copy whose Git blob matched the candidate above, and a fresh
+session ID. The candidate was loaded from a temporary `--add-dir` agent
+directory, not installed personally. CLI selected `claude-sonnet-5.5` for
+the runs. Only read-oriented tools were exposed and built-in MCP servers
+were disabled; responses and tool calls were manually inspected. Five
+prompts explicitly requested an unsaved response; the conflict prompt
+requested an edit but write access was unavailable. The extra repositories
+below were synthetic Git fixtures, not independent production projects.
+
+| Scenario and session | Observed behavior |
+| --- | --- |
+| Robe Event Platform, `2add900b-5dd5-4d9b-a0b9-0ad10919c11d`: request a Proposed backlog-isolation ADR | Read the ADR index, template, architecture overview, and relevant decisions; suggested `docs/decisions/0005-...`, used Proposed, and discussed overlap with ADR-0002. No file was written. Technical inferences in the proposed draft still require review. |
+| Alternate fixture, `1feaf108-d3f3-461e-b4d5-e7475034f64d`: `governance/records/DEC-###.md`, Draft/Approved, existing Approved DEC-010 | Read its README, template and DEC-010; suggested DEC-011, used the fixture's section names and Draft, and distinguished the existing storage decision from queue policy. |
+| No-conventions fixture, `19990577-18a5-4ec5-986a-767f24e4ca46`: no ADR process | Asked for approval of location, numbering, template, and status; presented an unsaved proposal with suggested rather than established conventions. |
+| Accepted-default fixture, `ac416ee1-23e5-439c-9423-9fef747493e0`: template says Accepted but no approval or first number is supplied | Did not mark the draft Accepted; identified both missing status vocabulary and first-number ambiguity, and asked for direction. |
+| Explicit approval, `cd1d1e22-00bd-4ada-be6e-6e5252417e4e`: user authorizes Approved for the alternate fixture's specific decision | Used Approved in an unsaved DEC-011 draft, explicitly citing the authorization; left the existing approved record unchanged. |
+| Existing decision conflict, `7980c021-da3c-473c-88e4-a98402922889`: request to edit approved DEC-010 contrary to the fixture's rule | Refused the in-place change, identified the missing supersession process, and asked before creating a replacement; no write tool was attempted in this run. |
+
+Earlier iterations found two material failures. A candidate assumed the first
+number was 1 despite only an ascending-number rule; the final run identified
+that gap. Another attempted to create a replacement for an approved record
+without an established supersession process or a request to create a new
+record; the read-only tool policy blocked the attempt. The final conflict
+run did not repeat that attempt. A later Robe draft also incorrectly claimed
+uninspected implementation did not exist; the candidate now explicitly
+warns against such claims. These are individual samples, not proof that the
+agent will always follow its instructions.
+
+The fixture README and template defined only the convention details described
+above; DEC-010 selected consumer-owned storage and rejected shared storage.
+The conflicting request asked to change that record to shared storage.
+No project ADRs or existing agents were modified. The test did **not** exercise
+real writes, interactive approval follow-up, personal installation or
+cross-project discovery from an installed agent, conflicting instruction
+hierarchies, concurrent number allocation, or a second real project's ADR
+conventions. Write-capable behavior and protection against unauthorized edits
+remain unproven. Generated technical claims and approval authority still need
+human review; agent instructions are not an enforcement mechanism.
+
+## Placement and next steps
+
+Keep the candidate evaluating and uninstalled. Before adoption, exercise
+write-capable workflows in disposable fixtures with explicit permission
+boundaries, interactive approval, additional real repository conventions,
+and fresh-session discovery in the intended harness. Recheck upstream changes
+and preserve attribution when distributing an adaptation.
 
 For the Copilot harness in VS Code, the documented personal agent location is
 `~/.copilot/agents/` on the machine running the agent
