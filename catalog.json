@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "inventory_date": "2026-11-21",
+  "status_values": ["discovered", "evaluating", "adopted", "retired"],
+  "sources": {
+    "mailflow": {
+      "kind": "local_repository",
+      "location": "~/Projects/mailflow",
+      "upstream_url": null,
+      "license": null,
+      "notes": "Local repository inspected; remote provenance and license not verified."
+    },
+    "robe-event-platform": {
+      "kind": "local_repository",
+      "location": "~/Projects/robe-event-platform",
+      "upstream_url": "https://github.com/michael-robeson/robe-event-platform",
+      "license": null,
+      "notes": "File revisions are last observed commits; inspect current worktree before use."
+    },
+    "adr-download": {
+      "kind": "downloaded_file",
+      "location": "~/Projects/robe-event-platform/.github/agents/adr-generator.agent.md",
+      "upstream_url": null,
+      "license": null,
+      "notes": "Downloaded source and upstream revision are unknown."
+    },
+    "vscode-plugin-cache": {
+      "kind": "provider_managed_cache",
+      "location": "~/.config/Code/agentPlugins",
+      "upstream_url": null,
+      "license": null,
+      "notes": "Provider and exact plugin release not verified per skill. Multiple cached snapshots exist; presence does not establish activation."
+    },
+    "vscode-runtime": {
+      "kind": "provider_managed_runtime",
+      "location": "~/.config/Code/User/globalStorage/github.copilot-chat",
+      "upstream_url": null,
+      "license": null,
+      "notes": "Generated VS Code agent files; runtime and harness behavior can vary."
+    },
+    "session-runtime": {
+      "kind": "session_runtime",
+      "location": null,
+      "upstream_url": null,
+      "license": null,
+      "notes": "Session-provided capability; no stable installation file or upstream version verified."
+    }
+  },
+  "capabilities": [
+    {"id":"robe-feature-lifecycle","name":"feature-lifecycle","type":"skill","source":"robe-event-platform","revision":"9fb6f87","scope":"repository:robe-event-platform","status":"adopted","location":"~/Projects/robe-event-platform/.github/skills/feature-lifecycle/SKILL.md","customization":"Adapted from Mailflow for Robe conventions","overlaps":["mailflow-feature-lifecycle","create-pull-request"],"review_notes":"Repository verification and review policy remain authoritative."},
+    {"id":"mailflow-feature-lifecycle","name":"feature-lifecycle","type":"skill","source":"mailflow","revision":"c7a199c","scope":"repository:mailflow","status":"adopted","location":"~/Projects/mailflow/.github/skills/feature-lifecycle/SKILL.md","customization":"Repository-specific","overlaps":["robe-feature-lifecycle","create-pull-request"],"review_notes":"Mailflow verification and authorization boundaries differ."},
+    {"id":"mailflow-verify-workflow","name":"verify-workflow","type":"skill","source":"mailflow","revision":"25400d3","scope":"repository:mailflow","status":"adopted","location":"~/Projects/mailflow/.github/skills/verify-workflow/SKILL.md","customization":"Repository-specific","overlaps":["mailflow-workflow-instructions"],"review_notes":"Offline and isolated verification; no implicit live Gmail authorization."},
+    {"id":"mailflow-workflow-instructions","name":"workflows","type":"instructions","source":"mailflow","revision":"25400d3","scope":"repository:mailflow/workflows/**/*.json","status":"adopted","location":"~/Projects/mailflow/.github/instructions/workflows.instructions.md","customization":"Repository-specific","overlaps":["mailflow-verify-workflow","mailflow-agents-md"],"review_notes":"File-pattern instructions reference workflow verification and runtime safety."},
+    {"id":"mailflow-agents-md","name":"Mailflow contributor guidance","type":"instructions","source":"mailflow","revision":"8f19d06","scope":"repository:mailflow","status":"adopted","location":"~/Projects/mailflow/AGENTS.md","customization":"Repository-specific","overlaps":["mailflow-workflow-instructions","mailflow-feature-lifecycle"],"review_notes":"Project guidance references the authoritative specialized procedures."},
+    {"id":"robe-agents-md","name":"Robe agent guidance","type":"instructions","source":"robe-event-platform","revision":"1ca6cbc","scope":"repository:robe-event-platform","status":"adopted","location":"~/Projects/robe-event-platform/AGENTS.md","customization":"Repository-specific","overlaps":["robe-feature-lifecycle"],"review_notes":"Project guidance references the authoritative feature lifecycle."},
+    {"id":"adr-generator","name":"ADR Generator","type":"agent","source":"adr-download","revision":null,"scope":"repository:robe-event-platform (observed); personal (proposed)","status":"evaluating","location":"~/Projects/robe-event-platform/.github/agents/adr-generator.agent.md","customization":"Unknown; local SHA-256 abbf07c6a768a21baa94a1aed858510c8038cb89866461d47ab64817e9f347ac","overlaps":["robe-agents-md"],"review_notes":"Untracked; origin and license unknown; path and template conflict with Robe conventions. See evaluations/adr-generator.md."},
+    {"id":"create-pull-request","name":"create-pull-request","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed session","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/create-pull-request/SKILL.md","customization":"Unknown","overlaps":["robe-feature-lifecycle","mailflow-feature-lifecycle"],"review_notes":"Creates PRs; repository lifecycle remains authoritative."},
+    {"id":"address-pr-comments","name":"address-pr-comments","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed session","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/address-pr-comments/SKILL.md","customization":"Unknown","overlaps":["robe-feature-lifecycle","mailflow-feature-lifecycle"],"review_notes":"PR feedback workflow."},
+    {"id":"form-github-search-query","name":"form-github-search-query","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed session","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/form-github-search-query/SKILL.md","customization":"Unknown","overlaps":["show-github-search-result"],"review_notes":"Forms issue and PR searches."},
+    {"id":"show-github-search-result","name":"show-github-search-result","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed session","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/show-github-search-result/SKILL.md","customization":"Unknown","overlaps":["form-github-search-query"],"review_notes":"Formats GitHub search results."},
+    {"id":"summarize-github-issue-pr-notification","name":"summarize-github-issue-pr-notification","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed session","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/summarize-github-issue-pr-notification/SKILL.md","customization":"Unknown","overlaps":[],"review_notes":"Summarizes GitHub items."},
+    {"id":"suggest-fix-issue","name":"suggest-fix-issue","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed session","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/suggest-fix-issue/SKILL.md","customization":"Unknown","overlaps":[],"review_notes":"Suggests issue fixes."},
+    {"id":"python-fact-grounded-coding","name":"python-fact-grounded-coding","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed session","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/python-fact-grounded-coding/SKILL.md","customization":"Unknown","overlaps":["python-type-inference"],"review_notes":"Evidence-based Python investigation."},
+    {"id":"python-type-inference","name":"python-type-inference","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed session","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/python-type-inference/SKILL.md","customization":"Unknown","overlaps":["python-add-type-annotations","python-write-stubs","python-fact-grounded-coding"],"review_notes":"Shared type verification workflow."},
+    {"id":"python-add-type-annotations","name":"python-add-type-annotations","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed session","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/python-add-type-annotations/SKILL.md","customization":"Unknown","overlaps":["python-type-inference","pylance-refactoring"],"review_notes":"Inline Python annotations."},
+    {"id":"python-write-stubs","name":"python-write-stubs","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed session","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/python-write-stubs/SKILL.md","customization":"Unknown","overlaps":["python-type-inference"],"review_notes":"Third-party Python stubs."},
+    {"id":"pylance-docs","name":"pylance-docs","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed session","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/pylance-docs/SKILL.md","customization":"Unknown","overlaps":[],"review_notes":"Official Pylance documentation."},
+    {"id":"pylance-refactoring","name":"pylance-refactoring","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed session","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/pylance-refactoring/SKILL.md","customization":"Unknown","overlaps":["python-add-type-annotations"],"review_notes":"Pylance-driven refactoring."},
+    {"id":"pylance-python-profiling","name":"pylance-python-profiling","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed session","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/pylance-python-profiling/SKILL.md","customization":"Unknown","overlaps":[],"review_notes":"Python profiling."},
+    {"id":"add-python-version-support","name":"add-python-version-support","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed session","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/add-python-version-support/SKILL.md","customization":"Unknown","overlaps":["drop-python-version-support"],"review_notes":"Add support at the upper end of a Python range."},
+    {"id":"drop-python-version-support","name":"drop-python-version-support","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed session","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/drop-python-version-support/SKILL.md","customization":"Unknown","overlaps":["add-python-version-support"],"review_notes":"Raise the supported Python minimum."},
+    {"id":"typescript-setup","name":"typescript-setup","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed cache","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/typescript-setup/SKILL.md","customization":"Unknown","overlaps":["typescript-update"],"review_notes":"Cached; current-session availability not established."},
+    {"id":"typescript-update","name":"typescript-update","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed cache","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/typescript-update/SKILL.md","customization":"Unknown","overlaps":["typescript-setup"],"review_notes":"Cached; current-session availability not established."},
+    {"id":"migrate-customizations","name":"migrate-customizations","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed cache","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/migrate-customizations/SKILL.md","customization":"Unknown","overlaps":[],"review_notes":"Cached migration workflow; activation requirements must be checked."},
+    {"id":"create-canvas","name":"create-canvas","type":"skill","source":"vscode-plugin-cache","revision":null,"scope":"provider-managed session","status":"discovered","location":"~/.config/Code/agentPlugins/**/skills/create-canvas/SKILL.md","customization":"Unknown","overlaps":[],"review_notes":"Copilot extension canvas creation."},
+    {"id":"troubleshoot","name":"troubleshoot","type":"skill","source":"session-runtime","revision":null,"scope":"SDK session","status":"discovered","location":null,"customization":"Unknown","overlaps":[],"review_notes":"Investigates Copilot session behavior and event logs."},
+    {"id":"vscode-plan","name":"Plan","type":"agent","source":"vscode-runtime","revision":null,"scope":"VS Code Local harness","status":"discovered","location":"~/.config/Code/User/globalStorage/github.copilot-chat/plan-agent/Plan.agent.md","customization":"Provider-managed; local modifications not verified","overlaps":[],"review_notes":"Read-only planning agent."},
+    {"id":"vscode-ask","name":"Ask","type":"agent","source":"vscode-runtime","revision":null,"scope":"VS Code Local harness","status":"discovered","location":"~/.config/Code/User/globalStorage/github.copilot-chat/ask-agent/Ask.agent.md","customization":"Provider-managed; local modifications not verified","overlaps":[],"review_notes":"Read-only question-answering agent."},
+    {"id":"vscode-explore","name":"Explore","type":"agent","source":"vscode-runtime","revision":null,"scope":"VS Code Local harness","status":"discovered","location":"~/.config/Code/User/globalStorage/github.copilot-chat/explore-agent/Explore.agent.md","customization":"Provider-managed; local modifications not verified","overlaps":["session-explore"],"review_notes":"Read-only exploration subagent; not the same installation as the session agent."},
+    {"id":"session-explore","name":"explore","type":"agent","source":"session-runtime","revision":null,"scope":"SDK session","status":"discovered","location":null,"customization":"Unknown","overlaps":["vscode-explore"],"review_notes":"Read-only exploration."},
+    {"id":"session-task","name":"task","type":"agent","source":"session-runtime","revision":null,"scope":"SDK session","status":"discovered","location":null,"customization":"Unknown","overlaps":[],"review_notes":"Runs bounded commands."},
+    {"id":"session-general-purpose","name":"general-purpose","type":"agent","source":"session-runtime","revision":null,"scope":"SDK session","status":"discovered","location":null,"customization":"Unknown","overlaps":[],"review_notes":"General implementation and debugging."},
+    {"id":"session-rubber-duck","name":"rubber-duck","type":"agent","source":"session-runtime","revision":null,"scope":"SDK session","status":"discovered","location":null,"customization":"Unknown","overlaps":["session-code-review"],"review_notes":"Reviews plans and implementations for substantive bugs."},
+    {"id":"session-code-review","name":"code-review","type":"agent","source":"session-runtime","revision":null,"scope":"SDK session","status":"discovered","location":null,"customization":"Unknown","overlaps":["session-rubber-duck","session-security-review"],"review_notes":"Reviews code changes."},
+    {"id":"session-research","name":"research","type":"agent","source":"session-runtime","revision":null,"scope":"SDK session","status":"discovered","location":null,"customization":"Unknown","overlaps":[],"review_notes":"GitHub and web research."},
+    {"id":"session-security-review","name":"security-review","type":"agent","source":"session-runtime","revision":null,"scope":"SDK session","status":"discovered","location":null,"customization":"Unknown","overlaps":["session-code-review"],"review_notes":"Security-focused review."}
+  ]
+}
