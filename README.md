@@ -8,6 +8,7 @@ grant permissions, or replace their owning instructions.
 
 - [catalog.json](catalog.json): machine-readable inventory.
 - [evaluations/](evaluations/): focused reviews and outstanding decisions.
+- [agents/](agents/): personal-agent candidates under evaluation, not installed.
 
 The initial inventory was captured from the local machine on 2026-11-21.
 Paths beginning `~/` are observed locations on that machine, not promises
@@ -40,8 +41,8 @@ tokens, private runtime data, or sensitive payloads in the catalog.
 ## Scope and ownership
 
 - Personal Copilot skills and agents can eventually be maintained here and
-  installed in harness-supported user locations after review. This repository
-  does not yet contain or install personal capability files.
+  installed in harness-supported user locations after review. Candidate files
+  in this repository are not installed or adopted merely by being present.
 - Project-specific instructions and skills remain authoritative in their
   owning repositories. Their records here are references, not copies.
 - Provider-managed runtime and plugin capabilities remain managed by their
