@@ -46,7 +46,7 @@ def run_git(
             text=True,
         )
     except subprocess.CalledProcessError as error:
-        detail = error.stderr.strip() or error.stdout.strip() or str(error)
+        detail = (error.stderr or "").strip() or (error.stdout or "").strip() or str(error)
         raise GitError(detail) from error
 
 
@@ -72,3 +72,15 @@ def ensure_clean(root: Path) -> None:
     dirty = dirty_porcelain(root)
     if dirty:
         raise GitError("Repository worktree is dirty:\n" + dirty.rstrip())
+
+
+def ensure_no_git_operation(root: Path) -> None:
+    for name in (
+        "MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge",
+        "rebase-apply", "BISECT_LOG", "index.lock",
+    ):
+        path = Path(run_git(root, ["rev-parse", "--git-path", name]).stdout.strip())
+        if not path.is_absolute():
+            path = root / path
+        if path.exists():
+            raise GitError(f"Git operation in progress: {name}")

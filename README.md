@@ -60,6 +60,16 @@ records discovery and provenance limits.
 
 Increment 1 provides a local, dependency-light lifecycle CLI:
 
+Run the required local checks from the repository root:
+
+```sh
+./scripts/verify
+```
+
+The entry point compiles the Python sources and runs the unit suite. The
+lifecycle readiness gate invokes it; verification alone does not record
+approval or authorize integration.
+
 ```sh
 python3 -m pip install -e .
 eng-lifecycle start --repo . --feature shared-lifecycle-cli
@@ -77,5 +87,26 @@ sh scripts/install-hooks.sh
 
 The CLI stores only review evidence and approval metadata under Git's
 actual git directory. It derives branch, commit, worktree, review, and
-candidate state from Git. This increment does not create, merge, or clean
-up pull requests.
+candidate state from Git. Start requires a clean checkout of the configured
+base and refuses local-ahead or divergent history. Scoped commits refuse an
+already populated index; installed Git hooks run normally. The supplied hook
+checks staged Python blobs, not unstaged working-tree contents.
+
+The repository's `.github/lifecycle.json` defines commands as shell-like
+strings or argument arrays, executed directly without a shell. Readiness
+requires at least one check. For a check needing special authorization, declare
+its category in `special_authorization` and use an entry such as
+`{"argv": ["example-check"], "authorization": "database"}`. Supply
+`--authorize database` to `review` or `commit` only after obtaining the
+appropriate task-specific authorization. This flag and the repository's
+classification are workflow safeguards, not permission enforcement or a
+sandbox; commands can have effects beyond what their labels describe.
+
+Review requires a clean committed candidate and matching feature name. A
+failed or interrupted review cannot be approved. The exact `APPROVED`
+message must first be given by the user in Copilot Chat; the local record is
+not proof of identity. Approval and status require the same acceptance
+criteria and validate the current review, complete check evidence, candidate,
+and policy. A successful rerun with the same binding need not invalidate
+approval merely because timing or other incidental evidence changed.
+This increment does not create, merge, or clean up pull requests.

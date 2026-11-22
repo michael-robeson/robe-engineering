@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,7 +41,7 @@ def run_command(cwd: Path, argv: list[str]) -> dict[str, Any]:
         exit_code = completed.returncode
         stdout = completed.stdout
         stderr = completed.stderr
-    except FileNotFoundError as error:
+    except OSError as error:
         exit_code = 127
         stdout = ""
         stderr = str(error)
@@ -59,5 +61,14 @@ def write_json(path: Path, value: dict[str, Any]) -> str:
     encoded = json.dumps(
         value, sort_keys=True, indent=2, ensure_ascii=False
     ).encode("utf-8")
-    path.write_bytes(encoded)
+    descriptor, temporary = tempfile.mkstemp(prefix=".lifecycle-", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(encoded)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
     return sha256_bytes(encoded)

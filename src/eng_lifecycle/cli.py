@@ -8,12 +8,11 @@ from pathlib import Path
 from typing import Sequence
 
 from .approval import read_json
-from .config import LifecycleError, load_config
+from .config import LifecycleConfig, LifecycleError, load_config
 from .evidence import (
     feature_storage_dir,
     run_command,
     sha256_bytes,
-    sha256_json,
     write_json,
 )
 from .gitops import (
@@ -22,6 +21,7 @@ from .gitops import (
     current_branch,
     dirty_porcelain,
     ensure_clean,
+    ensure_no_git_operation,
     git_dir,
     head_commit,
     repository_root,
@@ -64,16 +64,12 @@ def json_text(value: object) -> str:
 def cmd_start(args: argparse.Namespace) -> int:
     root = repository_root(Path(args.repo))
     config = load_config(root)
-    if dirty_porcelain(root):
-        raise LifecycleError("Refusing to start with a dirty worktree")
-    run_git(root, ["fetch", "--prune", "origin"], check=True)
-    run_git(root, ["switch", config.base], check=True)
-    run_git(
-        root,
-        ["merge", "--ff-only", f"origin/{config.base}"],
-        check=True,
-    )
+    ensure_no_git_operation(root)
+    ensure_clean(root)
+    if current_branch(root) != config.base:
+        raise LifecycleError(f"Start requires checkout of {config.base}")
     branch = branch_name(args.feature, config.feature_prefix)
+    run_git(root, ["check-ref-format", "--branch", branch])
     existing = run_git(
         root,
         ["show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
@@ -81,6 +77,14 @@ def cmd_start(args: argparse.Namespace) -> int:
     )
     if existing.returncode == 0:
         raise LifecycleError(f"Feature branch already exists: {branch}")
+    if existing.returncode != 1:
+        raise LifecycleError("Unable to determine whether the feature branch exists")
+    run_git(root, ["fetch", "origin", config.base])
+    remote = "FETCH_HEAD"
+    result = run_git(root, ["merge-base", "--is-ancestor", "HEAD", remote], check=False)
+    if result.returncode != 0:
+        raise LifecycleError("Local base is ahead of or divergent from origin")
+    run_git(root, ["merge", "--ff-only", remote])
     run_git(root, ["switch", "-c", branch], check=True)
     print(json_text({"repository": str(root), "branch": branch, "base": config.base}))
     return 0
@@ -89,6 +93,7 @@ def cmd_start(args: argparse.Namespace) -> int:
 def cmd_commit(args: argparse.Namespace) -> int:
     root = repository_root(Path(args.repo))
     config = load_config(root)
+    ensure_no_git_operation(root)
     branch = current_branch(root)
     if not branch.startswith(config.feature_prefix):
         raise LifecycleError(
@@ -96,18 +101,30 @@ def cmd_commit(args: argparse.Namespace) -> int:
         )
     if not args.paths:
         raise LifecycleError("At least one --path is required")
+    checks = config.gate_commands("commit_gate")
+    for check in checks:
+        if check.authorization and check.authorization not in args.authorize:
+            raise LifecycleError(f"Commit check requires authorization: {check.authorization}")
 
+    existing = run_git(root, ["diff", "--cached", "--quiet"], check=False)
+    if existing.returncode != 0:
+        raise LifecycleError("Refusing scoped commit with existing staged changes")
     run_git(root, ["add", "--", *args.paths], check=True)
     staged = run_git(root, ["diff", "--cached", "--quiet"], check=False)
     if staged.returncode == 0:
         raise LifecycleError("No staged changes to commit")
+    if staged.returncode != 1:
+        raise LifecycleError("Unable to inspect staged changes")
 
     gate_results = []
-    for argv in config.gate_commands("commit_gate"):
-        result = run_command(root, argv)
+    staged_tree = run_git(root, ["write-tree"]).stdout.strip()
+    for check in checks:
+        result = run_command(root, check.argv)
         gate_results.append(result)
         if result["exit_code"] != 0:
-            raise LifecycleError(f"Commit gate failed: {' '.join(argv)}")
+            raise LifecycleError(f"Commit gate failed: {' '.join(check.argv)}")
+    if run_git(root, ["write-tree"]).stdout.strip() != staged_tree:
+        raise LifecycleError("Commit gate changed the staged snapshot")
 
     run_git(
         root,
@@ -154,7 +171,7 @@ def read_criteria(args: argparse.Namespace) -> tuple[list[str], str]:
             )
         text = path.read_text(encoding="utf-8")
     elif getattr(args, "criteria", None):
-        text = "\n".join(args.criteria)
+        text = args.criteria
     else:
         raise LifecycleError(
             "Acceptance criteria are required via --criteria or --criteria-file"
@@ -182,33 +199,102 @@ def validate_review(review: dict[str, object]) -> None:
         raise LifecycleError(
             "Invalid review record; missing fields: " + ", ".join(missing)
         )
-    if review["schema"] != 1:
-        raise LifecycleError("Unsupported review record schema")
+    if type(review["schema"]) is not int or review["schema"] != 1 or review["ready"] is not True:
+        raise LifecycleError("Review is incomplete or unsuccessful")
+
+
+def feature_branch(root: Path, prefix: str, feature: str) -> str:
+    branch = current_branch(root)
+    if branch != branch_name(feature, prefix):
+        raise LifecycleError("Feature identifier does not match the current branch")
+    return branch
+
+
+def validate_evidence(
+    config: LifecycleConfig, directory: Path, expected: dict[str, object]
+) -> dict[str, object]:
+    # The local record is a consistency safeguard, not an authenticated signature.
+    review = read_json(directory / "review.json")
+    evidence = read_json(directory / "evidence.json")
+    validate_review(review)
+    if review.get("evidence_sha256") != sha256_bytes(
+        (directory / "evidence.json").read_bytes()
+    ):
+        raise LifecycleError("Review and evidence hashes do not match")
+    for key, value in expected.items():
+        if review.get(key) != value or evidence.get(key) != value:
+            raise LifecycleError(f"Review or evidence does not match current {key}")
+    if review.get("acceptance_criteria") != evidence.get("acceptance_criteria"):
+        raise LifecycleError("Review and evidence criteria do not match")
+    if type(evidence.get("schema")) is not int or evidence.get("schema") != 1 or evidence.get("passed") is not True:
+        raise LifecycleError("Readiness evidence is incomplete or unsuccessful")
+    if type(evidence.get("failed_count")) is not int or evidence.get("failed_count") != 0:
+        raise LifecycleError("Readiness evidence reports failed checks")
+    checks = config.gate_commands("readiness_gate")
+    results = evidence.get("commands")
+    if not isinstance(results, list) or len(results) != len(checks):
+        raise LifecycleError("Readiness evidence is missing required checks")
+    for check, result in zip(checks, results):
+        if (
+            not isinstance(result, dict)
+            or result.get("argv") != check.argv
+            or result.get("exit_code") != 0
+            or type(result.get("exit_code")) is not int
+            or result.get("authorization") != check.authorization
+            or (check.authorization and result.get("authorized") is not True)
+            or not all(isinstance(result.get(field), str) for field in ("stdout", "stderr", "started_at", "ended_at"))
+            or type(result.get("duration_seconds")) not in (int, float)
+            or result["duration_seconds"] < 0
+        ):
+            raise LifecycleError("Readiness evidence contains a failed or skipped check")
+    return review
 
 
 def cmd_review(args: argparse.Namespace) -> int:
     root = repository_root(Path(args.repo))
     config = load_config(root)
-    branch = current_branch(root)
-    if not branch.startswith(config.feature_prefix):
-        raise LifecycleError(
-            f"Review only from a {config.feature_prefix} feature branch"
-        )
+    branch = feature_branch(root, config.feature_prefix, args.feature)
+    ensure_no_git_operation(root)
     ensure_clean(root)
     candidate = head_commit(root)
     tree = candidate_tree(root)
     criteria, criteria_hash = read_criteria(args)
     policy_hash = sha256_bytes(config.policy_bytes())
 
+    directory = storage(root, branch)
+    write_json(directory / "review.json", {"schema": 1, "ready": False})
     results = []
-    for argv in config.gate_commands("readiness_gate"):
-        results.append(run_command(root, argv))
+    for check in config.gate_commands("readiness_gate"):
+        if check.authorization and check.authorization not in args.authorize:
+            result = {
+                "argv": check.argv,
+                "exit_code": None,
+                "authorization": check.authorization,
+                "authorized": False,
+                "error": "Special authorization required",
+            }
+        else:
+            result = run_command(root, check.argv)
+            result["authorization"] = check.authorization
+            result["authorized"] = True
+        results.append(result)
     failed = [result for result in results if result["exit_code"] != 0]
+    ensure_no_git_operation(root)
+    ensure_clean(root)
+    if (
+        current_branch(root) != branch
+        or head_commit(root) != candidate
+        or candidate_tree(root) != tree
+        or sha256_bytes(load_config(root).policy_bytes()) != policy_hash
+        or read_criteria(args)[1] != criteria_hash
+    ):
+        raise LifecycleError("Candidate, criteria, or policy changed during readiness checks")
 
     evidence = {
         "schema": 1,
         "repository": str(root),
         "branch": branch,
+        "base": config.base,
         "candidate_commit": candidate,
         "candidate_tree": tree,
         "acceptance_criteria_sha256": criteria_hash,
@@ -218,7 +304,7 @@ def cmd_review(args: argparse.Namespace) -> int:
         "passed": not failed,
         "failed_count": len(failed),
     }
-    evidence_hash = write_json(storage(root, branch) / "evidence.json", evidence)
+    evidence_hash = write_json(directory / "evidence.json", evidence)
     review = {
         "schema": 1,
         "repository": str(root),
@@ -232,7 +318,7 @@ def cmd_review(args: argparse.Namespace) -> int:
         "ready": not failed,
         "evidence_sha256": evidence_hash,
     }
-    review_hash = write_json(storage(root, branch) / "review.json", review)
+    review_hash = write_json(directory / "review.json", review)
     print(
         json_text(
             {
@@ -272,7 +358,7 @@ def validate_approval_record(record: dict[str, object]) -> None:
         raise LifecycleError(
             "Invalid approval record; missing fields: " + ", ".join(missing)
         )
-    if record["schema"] != 1:
+    if type(record["schema"]) is not int or record["schema"] != 1:
         raise LifecycleError("Unsupported approval record schema")
     if record["approved"] is not True:
         raise LifecycleError("Approval record is not approved")
@@ -292,6 +378,15 @@ def validate_approval_record(record: dict[str, object]) -> None:
     )
     if any(not isinstance(record[field], str) for field in string_fields):
         raise LifecycleError("Invalid approval record; string fields are malformed")
+    timestamp = record["approved_at"]
+    if not isinstance(timestamp, str):
+        raise LifecycleError("Invalid approval record; malformed approval time")
+    try:
+        approved_at = datetime.fromisoformat(timestamp)
+        if approved_at.tzinfo is None:
+            raise ValueError("timezone missing")
+    except ValueError as error:
+        raise LifecycleError("Invalid approval record; malformed approval time") from error
     hash_fields = (
         "candidate_commit",
         "candidate_tree",
@@ -317,38 +412,25 @@ def cmd_approve(args: argparse.Namespace) -> int:
     config = load_config(root)
     if args.message != "APPROVED":
         raise LifecycleError("Approval message must be exactly APPROVED")
-    branch = current_branch(root)
-    if not branch.startswith(config.feature_prefix):
-        raise LifecycleError("Approval only applies to a feature branch")
+    branch = feature_branch(root, config.feature_prefix, args.feature)
+    ensure_no_git_operation(root)
     ensure_clean(root)
     candidate = head_commit(root)
     tree = candidate_tree(root)
-    _, criteria_hash = read_criteria(args)
+    criteria, criteria_hash = read_criteria(args)
     policy_hash = sha256_bytes(config.policy_bytes())
     directory = storage(root, branch)
-    review = read_json(directory / "review.json")
-    evidence = read_json(directory / "evidence.json")
-    validate_review(review)
-    if review["candidate_commit"] != candidate:
-        raise LifecycleError(
-            "The reviewed candidate commit changed; approval is not valid"
-        )
-    if review["candidate_tree"] != tree:
-        raise LifecycleError(
-            "The reviewed candidate content changed; approval is not valid"
-        )
-    if review["acceptance_criteria_sha256"] != criteria_hash:
-        raise LifecycleError(
-            "Acceptance criteria changed after review; approval is not valid"
-        )
-    if review["quality_policy_sha256"] != policy_hash:
-        raise LifecycleError(
-            "Quality policy changed after review; approval is not valid"
-        )
-    if evidence.get("passed") is not True:
-        raise LifecycleError("Readiness evidence did not pass")
-    if evidence.get("candidate_commit") != candidate:
-        raise LifecycleError("Readiness evidence does not belong to the candidate")
+    expected: dict[str, object] = {
+        "repository": str(root),
+        "branch": branch,
+        "base": config.base,
+        "candidate_commit": candidate,
+        "candidate_tree": tree,
+        "acceptance_criteria_sha256": criteria_hash,
+        "acceptance_criteria": criteria,
+        "quality_policy_sha256": policy_hash,
+    }
+    validate_evidence(config, directory, expected)
 
     review_bytes = (directory / "review.json").read_bytes()
     evidence_bytes = (directory / "evidence.json").read_bytes()
@@ -384,7 +466,7 @@ def cmd_approve(args: argparse.Namespace) -> int:
 def cmd_status(args: argparse.Namespace) -> int:
     root = repository_root(Path(args.repo))
     config = load_config(root)
-    branch = current_branch(root)
+    branch = feature_branch(root, config.feature_prefix, args.feature)
     directory = storage(root, branch)
     approval_path = directory / "approval.json"
     if not approval_path.is_file():
@@ -405,24 +487,26 @@ def cmd_status(args: argparse.Namespace) -> int:
     candidate = head_commit(root)
     tree = candidate_tree(root)
     dirty = dirty_porcelain(root)
-    if record["branch"] != branch:
-        reasons.append("approval belongs to a different branch")
-    if record["candidate_commit"] != candidate:
-        reasons.append("candidate commit changed")
-    if record["candidate_tree"] != tree:
-        reasons.append("candidate content changed")
-    if dirty:
-        reasons.append("worktree is dirty")
-    if sha256_bytes(config.policy_bytes()) != record["quality_policy_sha256"]:
-        reasons.append("quality policy changed")
-    if args.criteria_file:
-        criteria_path = Path(args.criteria_file).resolve()
-        if not criteria_path.is_file():
-            reasons.append("acceptance criteria file is missing")
-        else:
-            criteria_hash = sha256_bytes(criteria_path.read_bytes())
-            if criteria_hash != record["acceptance_criteria_sha256"]:
-                reasons.append("acceptance criteria changed")
+    try:
+        ensure_no_git_operation(root)
+        if dirty:
+            raise LifecycleError("worktree is dirty")
+        criteria, criteria_hash = read_criteria(args)
+        expected: dict[str, object] = {
+            "repository": str(root),
+            "branch": branch,
+            "base": config.base,
+            "candidate_commit": candidate,
+            "candidate_tree": tree,
+            "acceptance_criteria_sha256": criteria_hash,
+            "quality_policy_sha256": sha256_bytes(config.policy_bytes()),
+        }
+        for key, value in expected.items():
+            if record.get(key) != value:
+                raise LifecycleError(f"Approval does not match current {key}")
+        validate_evidence(config, directory, {**expected, "acceptance_criteria": criteria})
+    except (LifecycleError, GitError, OSError, UnicodeError) as error:
+        reasons.append(str(error))
 
     result = {
         "approved": not reasons,
@@ -450,6 +534,7 @@ def build_parser() -> argparse.ArgumentParser:
     commit.add_argument("--repo", default=".")
     commit.add_argument("--message", required=True)
     commit.add_argument("--path", dest="paths", action="append", default=[])
+    commit.add_argument("--authorize", action="append", default=[])
     commit.set_defaults(handler=cmd_commit)
 
     review = sub.add_parser("review")
@@ -458,19 +543,24 @@ def build_parser() -> argparse.ArgumentParser:
     criteria = review.add_mutually_exclusive_group(required=True)
     criteria.add_argument("--criteria")
     criteria.add_argument("--criteria-file")
+    review.add_argument("--authorize", action="append", default=[])
     review.set_defaults(handler=cmd_review)
 
     approve = sub.add_parser("approve")
     approve.add_argument("--repo", default=".")
     approve.add_argument("--feature", required=True)
     approve.add_argument("--message", required=True)
-    approve.add_argument("--criteria-file", required=True)
+    criteria = approve.add_mutually_exclusive_group(required=True)
+    criteria.add_argument("--criteria")
+    criteria.add_argument("--criteria-file")
     approve.set_defaults(handler=cmd_approve)
 
     status = sub.add_parser("status")
     status.add_argument("--repo", default=".")
     status.add_argument("--feature", required=True)
-    status.add_argument("--criteria-file")
+    criteria = status.add_mutually_exclusive_group(required=True)
+    criteria.add_argument("--criteria")
+    criteria.add_argument("--criteria-file")
     status.set_defaults(handler=cmd_status)
 
     return parser
@@ -481,7 +571,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return args.handler(args)
-    except (LifecycleError, GitError) as error:
+    except (LifecycleError, GitError, OSError, UnicodeError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2
 
