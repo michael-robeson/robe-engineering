@@ -1,8 +1,9 @@
 # Evaluation: ADR Generator
 
-- **Status:** evaluating; personal adoption remains unapproved.
-- **Recommendation:** evaluate the adapted candidate further before personal
-  adoption. Do not install or replace the existing agent yet.
+- **Status:** adopted for personal use.
+- **Recommendation:** use the adapted candidate for personal ADR drafting,
+  while retaining repository instructions and explicit authorization for
+  accepted status.
 - **Reviewed:** 2026-11-21.
 
 ## Provenance
@@ -72,7 +73,8 @@ and evidence-grounded decision analysis. Its Git blob is
 `d2d278408ded1ac17c0b226031d4f8d57a727ceb`; this content identifier is not
 the upstream commit. The upstream copyright and MIT permission notice are
 preserved in [ADR-GENERATOR-LICENSE](../agents/ADR-GENERATOR-LICENSE).
-The original downloaded agent is unchanged; the candidate is not installed.
+The original downloaded agent is unchanged. The candidate was subsequently
+installed for the controlled trial described below.
 
 ## Behavioral validation: 2026-11-21
 
@@ -117,17 +119,150 @@ conventions. Write-capable behavior and protection against unauthorized edits
 remain unproven. Generated technical claims and approval authority still need
 human review; agent instructions are not an enforcement mechanism.
 
+## Controlled personal trial: 2026-11-21
+
+The six read-only sessions supported convention discovery and approval
+handling in their sampled cases, but earlier iterations had assumed a first
+number, attempted an unauthorized replacement, and made an unsupported claim
+about uninspected implementation. These remain correctness risks rather than
+proof of reliable behavior. To limit their impact in this trial, shell and
+MCP tools were unavailable and each write-capable session was granted access
+to one named new ADR file only. These restrictions apply to the trial
+sessions, not automatically to future uses of the installed agent.
+
+Before installation, two fresh sessions used the staged candidate and
+write-capable tools in the synthetic alternate fixture:
+
+- `d4e2eee0-ff74-4846-9cf7-8fd75dab78f0` created the authorized DEC-011
+  with Draft status and the fixture template, without editing DEC-010.
+- `559439e0-d4f0-4edf-a62b-eed98a89c145` was asked to edit approved
+  DEC-010 contrary to the fixture's rule. With write permission for a
+  potential new DEC-012 but not DEC-010, it made no write attempt, refused
+  the edit, and asked before creating a replacement. This is one sampled
+  conflict, not a general guarantee.
+
+The candidate was then copied unchanged to
+`~/.copilot/agents/portable-adr-generator.agent.md`; the upstream MIT notice
+was copied alongside it as `ADR-GENERATOR-LICENSE`. This is the Copilot CLI
+user-agent location, not the VS Code Local profile location. The installed
+CLI trial agent's Git blob matches `d2d278408ded1ac17c0b226031d4f8d57a727ceb`.
+
+Fresh Copilot CLI 1.0.114 session `2bd544fd-31dc-44d9-b506-571b81850279`,
+opened from a Robe Event Platform worktree on
+`feature/adr-generator-trial`, selected `--agent portable-adr-generator`
+without a temporary agent directory. It identified the candidate and
+upstream attribution and read the repository's ADR index, template, and
+instructions. This verifies CLI discovery for this machine and harness, not
+automatic discovery in other Copilot harnesses.
+
+Fresh session `6f0e8c1b-5e2e-4056-a980-af82d96de10a` used the installed
+agent to create a Proposed ADR on dead-letter remediation and replay. It
+read the relevant accepted ADRs and architecture, and created only the
+permitted new `docs/decisions/0005-dead-letter-remediation-and-replay.md`.
+No accepted ADR was changed. The trial draft is uncommitted and unmerged in
+the isolated worktree; it is not an approved platform decision.
+
+The generated draft incorrectly described a dead-lettered message as an
+unprocessed outcome, although ADR-0002 explicitly says a transaction may
+commit before an acknowledgment is lost. This was not caused by missing
+repository evidence or a conflicting instruction: the evidence was available
+in the accepted ADR, but the agent made an unsupported inference and failed
+to reconcile it with that evidence. The trial reviewer corrected the
+statement to say processing is unknown, and removed an unsupported
+requirement to settle every open detail before follow-up work. These were
+manual changes after the agent invocation, not agent behavior. Other
+technical claims and the proposed recovery direction still require review.
+
+## Evidence-grounding review
+
+The dead-letter error exposed a general gap: the candidate asked for factual
+support but did not make it operationally distinct whether a statement
+describes an implemented capability, an accepted decision, a proposed design,
+or a future possibility. The candidate now requires the agent to classify
+material claims by evidence and lifecycle state, verify implemented claims
+against inspected sources, distinguish accepted intent from implementation,
+attribute proposals, and leave incomplete or conflicting evidence unresolved.
+This is general guidance, not a Pub/Sub-specific rule. The original error
+remains evidence that instruction text alone does not ensure correct
+reasoning.
+
+The installed Copilot CLI trial copy was updated to match the new candidate
+revision, `907bdedcf5c4abeeb01ec4076d3f47e52ad21822`.
+
+Fresh Copilot CLI session `9db8fad5-8d73-4f56-bffd-04742cc81dd6` tested the
+new evidence categories against the trial ADR, accepted ADRs, implementation,
+tests, and development guide. It distinguished accepted design intent from
+implementation evidence, identified ADR-0005 as Proposed, and left unresolved
+items as future/open. It also correctly said a dead-lettered message's
+processing outcome is unknown: ADR-0002 describes commit followed by lost
+acknowledgment, while the implementation test verifies that redelivery is
+duplicate-safe but does not exercise dead-lettering. The response noted its
+limited code/config search rather than treating that search alone as proof of
+non-existence. This is a successful sample in Copilot CLI, not evidence for
+VS Code Local or a guarantee of consistent reasoning.
+
+## VS Code Copilot Local validation
+
+A successful fresh VS Code Copilot Local trial was completed for
+ADR-0005, Dead-Letter Remediation and Replay. The session discovered and
+invoked the personal candidate and produced a Proposed ADR draft in the
+disposable Robe Event Platform worktree. The result was not promoted,
+accepted, or merged. A retained session identifier and complete desktop
+transcript were not available in the catalog evidence, so this record does
+not infer behavior beyond the observed trial.
+
+The trial retained the distinction between accepted architectural direction,
+implemented capabilities, tested behavior, and proposed functionality:
+
+- **Accepted direction:** ADR-0002 establishes at-least-once delivery,
+  independent push consumers, bounded retries, and a dead-letter topic
+  approach. Its thresholds, ownership, visibility, replay, and operational
+  procedures remain open.
+- **Implemented capability:** the local Compose Pub/Sub bootstrap creates
+  the topic and push subscriptions but does not configure a dead-letter
+  policy. The item and audit consumers provide HTTP acknowledgment and
+  idempotent persistence, but no remediation or replay implementation.
+- **Tested behavior:** end-to-end tests verify retry after a database outage,
+  duplicate-safe redelivery after a lost post-commit response, and independent
+  consumer outcomes. They do not exercise Pub/Sub dead-letter forwarding or
+  replay.
+- **Proposed functionality:** ADR-0005 proposes human-controlled,
+  consumer-scoped diagnosis and replay principles. It remains Proposed and
+  was not implemented.
+
+The trial also preserved unresolved architecture questions: dead-letter topic
+and subscription ownership; maximum delivery attempts and backoff; alert and
+retention thresholds; remediation and replay authorization; replay tooling;
+handling permanently unprocessable events and missed forwarding; sensitive
+payload controls; environment differences; and cloud integration validation.
+The local Pub/Sub emulator does not establish production GCP or Cloud SQL
+behavior.
+
+This result verifies the candidate in VS Code Copilot Local for this single
+trial. It is not proof of all future responses, and it does not establish
+unrestricted write safety, interactive approval behavior, or discovery in
+every future profile or VS Code/Copilot configuration.
+
+The VS Code reference states that Local user agents use VS Code profile
+storage, separate from `~/.copilot/agents/`; the candidate also has a Copilot
+CLI location. The harness's planned deprecation makes future availability
+uncertain. Keep the agent source canonical in this repository and preserve
+the upstream attribution and adapted revision.
+
 ## Placement and next steps
 
-Keep the candidate evaluating and uninstalled. Before adoption, exercise
-write-capable workflows in disposable fixtures with explicit permission
-boundaries, interactive approval, additional real repository conventions,
-and fresh-session discovery in the intended harness. Recheck upstream changes
-and preserve attribution when distributing an adaptation.
+Adopt the candidate for personal use while keeping repository instructions,
+accepted decisions, and explicit authorization authoritative. The canonical
+adapted source is `~/Projects/robe-engineering/agents/adr-generator.agent.md`;
+the upstream MIT attribution is preserved alongside it. Controlled personal
+installations are recorded at `~/.copilot/agents/portable-adr-generator.agent.md`
+and `~/.copilot/agents/ADR-GENERATOR-LICENSE`.
+
+Verified environments are Copilot CLI and VS Code Copilot Local. The evidence
+records a Copilot CLI discovery and drafting trial and a successful VS Code
+Copilot Local ADR-0005 trial. It does not claim verification of write safety
+in other harnesses or of every repository convention.
 
 For the Copilot harness in VS Code, the documented personal agent location is
 `~/.copilot/agents/` on the machine running the agent
 ([VS Code custom-agent reference](https://code.visualstudio.com/docs/agents/reference/custom-agent-file-reference)).
-The separate VS Code Local harness uses profile storage. Installation and
-cross-project discovery have not been tested; no global installation or
-agent rewrite was performed.
