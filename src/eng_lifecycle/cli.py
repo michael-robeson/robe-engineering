@@ -528,6 +528,12 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0 if not reasons else 1
 
 
+def cmd_integrate(args: argparse.Namespace) -> int:
+    from .integration import integrate
+
+    return integrate(args)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="eng-lifecycle")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -569,6 +575,16 @@ def build_parser() -> argparse.ArgumentParser:
     criteria.add_argument("--criteria")
     criteria.add_argument("--criteria-file")
     status.set_defaults(handler=cmd_status)
+
+    for name in ("integrate", "resume"):
+        command = sub.add_parser(name)
+        command.add_argument("--repo", default=".")
+        command.add_argument("--feature", required=True)
+        criteria = command.add_mutually_exclusive_group(required=True)
+        criteria.add_argument("--criteria")
+        criteria.add_argument("--criteria-file")
+        command.add_argument("--authorize", action="append", default=[])
+        command.set_defaults(handler=cmd_integrate)
 
     return parser
 

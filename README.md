@@ -105,7 +105,8 @@ complete the setup rather than using a session-specific executable path.
 
 ## Engineering lifecycle CLI
 
-Increment 1 provides a local, dependency-light lifecycle CLI.
+The local, dependency-light lifecycle CLI supports readiness and
+post-approval integration.
 
 Run the required local checks from the repository root:
 
@@ -123,6 +124,8 @@ eng-lifecycle commit --repo . --message "Implement increment" --path src
 eng-lifecycle review --repo . --feature shared-lifecycle-cli --criteria-file acceptance.txt
 eng-lifecycle approve --repo . --feature shared-lifecycle-cli --criteria-file acceptance.txt --message APPROVED
 eng-lifecycle status --repo . --feature shared-lifecycle-cli --criteria-file acceptance.txt
+eng-lifecycle integrate --repo . --feature shared-lifecycle-cli --criteria-file acceptance.txt
+eng-lifecycle resume --repo . --feature shared-lifecycle-cli --criteria-file acceptance.txt
 ```
 
 Install the repository pre-commit hook separately:
@@ -157,4 +160,37 @@ and policy. A successful rerun with the same binding need not invalidate
 approval merely because timing or other incidental evidence changed.
 Policy drift is reported even when the changed policy file makes the worktree
 dirty; approval still requires a clean worktree.
-This increment does not create, merge, or clean up pull requests.
+
+### Post-approval integration
+
+Only run `integrate` or `resume` after explicit user approval of that exact
+candidate. They validate the existing approval and evidence, run readiness
+and integration checks, push the approved commit, create or update its PR,
+wait up to ten minutes for required CI, and check review threads and merge
+eligibility. They merge only with a matching PR head, then synchronize the
+local base and safely delete the merged feature branch. `resume` reconstructs
+state from Git and GitHub after interruption; it uses the same approval and
+criteria. No new source commit is created after approval.
+
+Each target repository must configure a nonempty `required_ci` array and an
+explicit `required_review` boolean in `.github/lifecycle.json`. A true
+review policy requires an approving GitHub review of the exact approved
+candidate; false permits no review but still blocks changes requested,
+GitHub-required reviews, and unresolved
+review threads. All named CI checks must succeed; missing, skipped, failed,
+ambiguous, or pending checks never count as a pass. Checks needing separate
+authorization still require the appropriate `--authorize` category. The
+current catalog repository does not yet configure required CI or a review
+policy, so its own integration is blocked until those are decided.
+
+The remote base must remain an ancestor of the approved candidate. Local base
+divergence, changed approval bindings, conflicting PRs, and changed branch
+tips block the operation. Only merge commits are supported for automatic
+integration; squash and rebase are blocked before pushing. Remote cleanup
+uses an expected-SHA lease, and local cleanup uses non-forced Git deletion.
+GitHub branch protections are needed to close races involving base or review
+changes between the final local checks and the merge request. Copilot
+permissions and GitHub authentication remain separate prerequisites.
+Integration uses a per-feature lock shared by worktrees; the lock is released
+when the process exits, including after interruption. This implementation
+requires POSIX file locking.

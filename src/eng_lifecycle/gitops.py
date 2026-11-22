@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -37,6 +38,7 @@ def run_git(
     *,
     check: bool = True,
     capture_output: bool = True,
+    non_interactive: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(
@@ -44,10 +46,15 @@ def run_git(
             check=check,
             capture_output=capture_output,
             text=True,
+            stdin=subprocess.DEVNULL if non_interactive else None,
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"} if non_interactive else None,
+            timeout=300 if non_interactive else None,
         )
     except subprocess.CalledProcessError as error:
         detail = (error.stderr or "").strip() or (error.stdout or "").strip() or str(error)
         raise GitError(detail) from error
+    except subprocess.TimeoutExpired as error:
+        raise GitError(f"Git command timed out: {args[0]}") from error
 
 
 def current_branch(root: Path) -> str:

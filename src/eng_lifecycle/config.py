@@ -118,6 +118,8 @@ def load_config(root: Path) -> LifecycleConfig:
             isinstance(name, str) and name for name in raw["required_ci"]
         ):
             raise LifecycleError("required_ci must be an array of names")
+    if "required_review" in raw and type(raw["required_review"]) is not bool:
+        raise LifecycleError("required_review must be a boolean")
     if "special_authorization" in raw:
         if not isinstance(raw["special_authorization"], list) or not all(
             isinstance(name, str) and name

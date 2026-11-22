@@ -27,7 +27,7 @@ def feature_storage_dir(repo_git_dir: Path, feature: str) -> Path:
     return repo_git_dir / "engineering-lifecycle" / feature_hash
 
 
-def run_command(cwd: Path, argv: list[str]) -> dict[str, Any]:
+def run_command(cwd: Path, argv: list[str], *, non_interactive: bool = False) -> dict[str, Any]:
     started = time.monotonic()
     started_at = datetime.now(timezone.utc).isoformat()
     try:
@@ -37,6 +37,7 @@ def run_command(cwd: Path, argv: list[str]) -> dict[str, Any]:
             check=False,
             capture_output=True,
             text=True,
+            stdin=subprocess.DEVNULL if non_interactive else None,
         )
         exit_code = completed.returncode
         stdout = completed.stdout
