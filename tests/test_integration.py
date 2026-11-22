@@ -30,7 +30,7 @@ class FakeGitHub:
         self.merged = 0
         self.unresolved = False
         self.review_commit: str | None = None
-        self.review_state = "APPROVED"
+        self.review_state: str | None = "APPROVED"
         self.review_author = "reviewer"
 
     def create_pr(self) -> None:
@@ -64,13 +64,14 @@ class FakeGitHub:
         if args[:2] == ["api", "graphql"]:
             if any("latestOpinionatedReviews" in arg for arg in args):
                 assert self.pr is not None
+                nodes = [] if self.review_state is None else [{
+                    "state": self.review_state,
+                    "commit": {"oid": self.review_commit or self.pr["headRefOid"]},
+                    "author": {"login": self.review_author},
+                }]
                 return {
                     "data": {"repository": {"pullRequest": {"latestOpinionatedReviews": {
-                        "nodes": [{
-                            "state": self.review_state,
-                            "commit": {"oid": self.review_commit or self.pr["headRefOid"]},
-                            "author": {"login": self.review_author},
-                        }],
+                        "nodes": nodes,
                         "pageInfo": {"hasNextPage": False, "endCursor": None},
                     }}}}
                 }
@@ -615,9 +616,49 @@ class IntegrationTest(unittest.TestCase):
         self.fake.create_pr()
         assert self.fake.pr is not None
         self.fake.pr["reviewDecision"] = None
+        self.fake.review_state = None
         result, output = self.call()
         self.assertEqual(result, 0, output)
         self.assertEqual(self.fake.merged, 1)
+
+    def test_optional_review_does_not_bypass_github_required_review(self) -> None:
+        self.update_policy(required_review=False)
+        self.approve()
+        self.fake.create_pr()
+        assert self.fake.pr is not None
+        self.fake.pr["reviewDecision"] = "REVIEW_REQUIRED"
+        self.fake.review_state = None
+        result, output = self.call()
+        self.assertEqual(result, 2)
+        self.assertIn("review policy", output)
+        self.assertEqual(self.fake.merged, 0)
+
+    def test_optional_review_with_missing_decision_fails_closed(self) -> None:
+        self.update_policy(required_review=False)
+        self.approve()
+        self.fake.create_pr()
+        assert self.fake.pr is not None
+        del self.fake.pr["reviewDecision"]
+        self.fake.review_state = None
+        result, output = self.call()
+        self.assertEqual(result, 2)
+        self.assertIn("review decision", output)
+        self.assertEqual(self.fake.merged, 0)
+
+    def test_optional_review_does_not_bypass_failed_ci(self) -> None:
+        self.update_policy(required_review=False)
+        self.approve()
+        self.fake.create_pr()
+        assert self.fake.pr is not None
+        self.fake.pr["reviewDecision"] = None
+        self.fake.review_state = None
+        self.fake.pr["statusCheckRollup"] = [
+            {"name": "unit", "status": "COMPLETED", "conclusion": "FAILURE"}
+        ]
+        result, output = self.call()
+        self.assertEqual(result, 2)
+        self.assertIn("required CI", output)
+        self.assertEqual(self.fake.merged, 0)
 
     def test_optional_review_still_blocks_requested_changes(self) -> None:
         self.update_policy(required_review=False)

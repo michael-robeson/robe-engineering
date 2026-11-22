@@ -39,10 +39,12 @@ base SHA or review state. Server-side protections are needed to close races
 between the final checks and the merge request.
 
 For this repository, the configured CI requirement is the
-`lifecycle-verify` pull-request job running `./scripts/verify`; an independent
-GitHub review is required. Configuration alone does not establish server-side
-branch protection. The initial workflow and its reported check name require a
-real GitHub integration exercise.
+`lifecycle-verify` pull-request job running `./scripts/verify`; the local
+policy does not add an independent GitHub review requirement. The user's
+explicit candidate approval authorizes integration but does not bypass any
+GitHub-required review or other protection. Configuration alone does not
+establish server-side branch protection. The initial workflow and its
+reported check name require a real GitHub integration exercise.
 
 The initial integration is intended as a combined Increment 1 and Increment 2
 PR against `develop`. Increment 1's earlier approval did not authorize its

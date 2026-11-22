@@ -17,7 +17,7 @@
     "commands": []
   },
   "required_ci": ["lifecycle-verify"],
-  "required_review": true,
+  "required_review": false,
   "special_authorization": [
     "database",
     "docker",

@@ -181,11 +181,13 @@ review threads. All named CI checks must succeed; missing, skipped, failed,
 ambiguous, or pending checks never count as a pass. Checks needing separate
 authorization still require the appropriate `--authorize` category. This
 repository requires the `lifecycle-verify` GitHub Actions job, which runs
-`./scripts/verify` on pull requests targeting `develop`, and an independent
-GitHub approval. This configuration is enforced by the CLI; it does not
-itself configure GitHub branch protection. The workflow and check name still
-need verification in a real pull request. If the required review is not yet
-available, integration stops; use `resume` after the independent review.
+`./scripts/verify` on pull requests targeting `develop`; it does not add an
+independent review requirement. The user's explicit candidate approval
+authorizes integration but does not bypass GitHub-required reviews or other
+protections. This configuration is enforced by the CLI; it does not itself
+configure GitHub branch protection. The workflow and check name still need
+verification in a real pull request. If a required GitHub review is not yet
+available, integration stops; use `resume` after it is satisfied.
 
 The remote base must remain an ancestor of the approved candidate. Local base
 divergence, changed approval bindings, conflicting PRs, and changed branch

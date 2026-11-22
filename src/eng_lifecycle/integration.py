@@ -211,7 +211,9 @@ def validate_pr(
 def validate_review_policy(pr: dict[str, object], required: bool) -> None:
     if pr.get("state") != "OPEN" or pr.get("isDraft") is not False:
         raise LifecycleError("Pull request is not open and ready for review")
-    decision = pr.get("reviewDecision")
+    if "reviewDecision" not in pr:
+        raise LifecycleError("Pull request review decision cannot be verified")
+    decision = pr["reviewDecision"]
     if decision not in (None, "", "APPROVED", "REVIEW_REQUIRED", "CHANGES_REQUESTED"):
         raise LifecycleError("Unknown pull request review decision")
     if decision in ("CHANGES_REQUESTED", "REVIEW_REQUIRED") or (required and decision != "APPROVED"):
