@@ -12,6 +12,13 @@ verification. Invoke the entry point directly rather than assembling ad hoc
 shell commands, environment assignments, output redirection, or compound
 shell logic. Preserve command exit codes and report actual results.
 
+Invoke lifecycle operations with `eng-lifecycle` from `PATH`, not an
+absolute or session-specific virtual-environment path. Follow the
+[developer setup](../README.md#engineering-lifecycle-cli-setup) to install
+and activate the editable package. If the terminal cannot access the
+executable, report the setup limitation instead of substituting a wrapper
+or changing permission settings.
+
 Verification does not approve a feature or authorize PR integration. Follow
 the lifecycle's separate readiness and explicit approval requirements. Do not
 change permission settings or bypass security controls to avoid prompts.

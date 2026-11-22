@@ -56,9 +56,46 @@ proposed personal placement and its conflicts with repository conventions.
 The [provider capabilities evaluation](evaluations/provider-capabilities.md)
 records discovery and provenance limits.
 
+## Engineering lifecycle CLI setup
+
+The CLI requires Python 3.11 or newer. From the repository root, create a
+local virtual environment and install the package in editable mode:
+
+```sh
+python3 -m venv .venv
+```
+
+Activate it in each development terminal before using the CLI. For Bash or
+other POSIX-compatible shells:
+
+```sh
+. .venv/bin/activate
+```
+
+For Fish:
+
+```fish
+source .venv/bin/activate.fish
+```
+
+With the environment activated, install the CLI using its `python` and check
+that its executable is on `PATH`:
+
+```sh
+python -m pip install -e .
+eng-lifecycle --help
+```
+
+Activation affects only the current shell and its child processes. For a new
+terminal, activate the same environment again; from another repository, use
+the activation script in this repository's `.venv` by its path. Configure the
+terminal or Copilot environment to inherit that activated environment before invoking
+`eng-lifecycle` by name. If the command is not found, complete this setup
+rather than relying on a session-specific executable path.
+
 ## Engineering lifecycle CLI
 
-Increment 1 provides a local, dependency-light lifecycle CLI:
+Increment 1 provides a local, dependency-light lifecycle CLI.
 
 Run the required local checks from the repository root:
 
@@ -71,7 +108,6 @@ lifecycle readiness gate invokes it; verification alone does not record
 approval or authorize integration.
 
 ```sh
-python3 -m pip install -e .
 eng-lifecycle start --repo . --feature shared-lifecycle-cli
 eng-lifecycle commit --repo . --message "Implement increment" --path src
 eng-lifecycle review --repo . --feature shared-lifecycle-cli --criteria-file acceptance.txt
