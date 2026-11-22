@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "base": "develop",
+  "feature_prefix": "feature/",
+  "merge_strategy": "merge",
+  "commit_gate": {
+    "commands": [
+      "python3 -m compileall -q src tests"
+    ]
+  },
+  "readiness_gate": {
+    "commands": [
+      "python3 -m unittest discover -s tests -v"
+    ]
+  },
+  "integration_gate": {
+    "commands": []
+  },
+  "required_ci": [],
+  "special_authorization": [
+    "database",
+    "docker",
+    "live_provider",
+    "destructive_cleanup"
+  ]
+}

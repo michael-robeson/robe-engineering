@@ -55,3 +55,27 @@ The [ADR Generator evaluation](evaluations/adr-generator.md) documents a
 proposed personal placement and its conflicts with repository conventions.
 The [provider capabilities evaluation](evaluations/provider-capabilities.md)
 records discovery and provenance limits.
+
+## Engineering lifecycle CLI
+
+Increment 1 provides a local, dependency-light lifecycle CLI:
+
+```sh
+python3 -m pip install -e .
+eng-lifecycle start --repo . --feature shared-lifecycle-cli
+eng-lifecycle commit --repo . --message "Implement increment" --path src
+eng-lifecycle review --repo . --feature shared-lifecycle-cli --criteria-file acceptance.txt
+eng-lifecycle approve --repo . --feature shared-lifecycle-cli --criteria-file acceptance.txt --message APPROVED
+eng-lifecycle status --repo . --feature shared-lifecycle-cli --criteria-file acceptance.txt
+```
+
+Install the repository pre-commit hook separately:
+
+```sh
+sh scripts/install-hooks.sh
+```
+
+The CLI stores only review evidence and approval metadata under Git's
+actual git directory. It derives branch, commit, worktree, review, and
+candidate state from Git. This increment does not create, merge, or clean
+up pull requests.
