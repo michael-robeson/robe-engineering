@@ -1,9 +1,17 @@
-# Repository verification
+# Repository inspection and verification
+
+For routine read-only Git inspection, use predictable individual commands
+such as `git status --short --branch` and `git --no-pager diff --stat`.
+Set the repository root using the terminal tool's working-directory option
+when available, rather than adding `git -C`, `env --chdir`, or absolute
+executable paths. If that option is unavailable, explain the limitation and
+use the least intrusive explicit repository targeting needed.
 
 Run `./scripts/verify` from the repository root for the required local
 verification. Invoke the entry point directly rather than assembling ad hoc
 shell commands, environment assignments, output redirection, or compound
-shell logic. Use the terminal's working-directory support when available.
+shell logic. Preserve command exit codes and report actual results.
 
 Verification does not approve a feature or authorize PR integration. Follow
-the lifecycle's separate readiness and explicit approval requirements.
+the lifecycle's separate readiness and explicit approval requirements. Do not
+change permission settings or bypass security controls to avoid prompts.
