@@ -88,10 +88,20 @@ eng-lifecycle --help
 
 Activation affects only the current shell and its child processes. For a new
 terminal, activate the same environment again; from another repository, use
-the activation script in this repository's `.venv` by its path. Configure the
-terminal or Copilot environment to inherit that activated environment before invoking
-`eng-lifecycle` by name. If the command is not found, complete this setup
-rather than relying on a session-specific executable path.
+the activation script in this repository's `.venv` by its path.
+
+Alternatively, if `~/.local/bin` is on `PATH`, expose the installed command
+to new terminals without activation. From this repository's root:
+
+```sh
+mkdir -p "$HOME/.local/bin"
+ln -s "$PWD/.venv/bin/eng-lifecycle" "$HOME/.local/bin/eng-lifecycle"
+```
+
+The link points to this checkout and its virtual environment; keep both in
+place. Do not replace an existing command without reviewing it. Verify
+`eng-lifecycle --help` in a new terminal. If the command is not found,
+complete the setup rather than using a session-specific executable path.
 
 ## Engineering lifecycle CLI
 
