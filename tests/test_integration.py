@@ -31,6 +31,7 @@ class FakeGitHub:
         self.unresolved = False
         self.review_commit: str | None = None
         self.review_state = "APPROVED"
+        self.review_author = "reviewer"
 
     def create_pr(self) -> None:
         self.pr = {
@@ -46,6 +47,7 @@ class FakeGitHub:
             "mergeStateStatus": "CLEAN",
             "mergeCommit": None,
             "reviewDecision": "APPROVED",
+            "author": {"login": "contributor"},
             "statusCheckRollup": [
                 {"name": "unit", "status": "COMPLETED", "conclusion": "SUCCESS"}
             ],
@@ -67,7 +69,7 @@ class FakeGitHub:
                         "nodes": [{
                             "state": self.review_state,
                             "commit": {"oid": self.review_commit or self.pr["headRefOid"]},
-                            "author": {"login": "reviewer"},
+                            "author": {"login": self.review_author},
                         }],
                         "pageInfo": {"hasNextPage": False, "endCursor": None},
                     }}}}
@@ -206,6 +208,14 @@ class IntegrationTest(unittest.TestCase):
 
     def test_missing_policy_blocks_before_push(self) -> None:
         self.update_policy(required_ci=[])
+        self.approve()
+        result, output = self.call()
+        self.assertEqual(result, 2)
+        self.assertIn("required_ci", output)
+        self.assertEqual(self.remote_feature(), "")
+
+    def test_absent_ci_policy_blocks_before_push(self) -> None:
+        self.update_policy(required_ci=None)
         self.approve()
         result, output = self.call()
         self.assertEqual(result, 2)
@@ -389,6 +399,43 @@ class IntegrationTest(unittest.TestCase):
         result, output = self.call()
         self.assertEqual(result, 2)
         self.assertIn("review policy", output)
+        self.assertEqual(self.fake.merged, 0)
+
+    def test_self_review_does_not_satisfy_required_review(self) -> None:
+        self.approve()
+        self.fake.create_pr()
+        self.fake.review_author = "Contributor"
+        result, output = self.call()
+        self.assertEqual(result, 2)
+        self.assertIn("No independent approving", output)
+        self.assertEqual(self.fake.merged, 0)
+
+    def test_unverifiable_pr_author_blocks_integration(self) -> None:
+        self.approve()
+        self.fake.create_pr()
+        assert self.fake.pr is not None
+        self.fake.pr["author"] = None
+        result, output = self.call()
+        self.assertEqual(result, 2)
+        self.assertIn("author cannot be verified", output)
+        self.assertEqual(self.remote_feature(), "")
+
+    def test_partial_graphql_error_blocks_merge(self) -> None:
+        self.approve()
+        self.fake.create_pr()
+        original = self.fake.json_call
+
+        def partial(root: Path, args: list[str]) -> str:
+            response = original(root, args)
+            if args[:2] == ["api", "graphql"]:
+                assert isinstance(response, dict)
+                response["errors"] = [{"message": "Incomplete data"}]
+            return json.dumps(response)
+
+        with patch("eng_lifecycle.integration.gh", side_effect=partial):
+            result, output = self.call()
+        self.assertEqual(result, 2)
+        self.assertIn("state cannot be verified", output)
         self.assertEqual(self.fake.merged, 0)
 
     def test_stale_review_on_older_commit_blocks_merge(self) -> None:

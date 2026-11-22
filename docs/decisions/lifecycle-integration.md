@@ -8,9 +8,10 @@ not a persistent phase machine.
 
 Integration requires an explicit repository review policy, named required
 checks, current successful readiness evidence, and final verification.
-Where review is required, at least one current approving GitHub review must
-refer to the exact approved candidate. Requested changes and unresolved
-threads block integration even when review is optional.
+Where review is required, at least one current approving GitHub review by
+someone other than the PR author must refer to the exact approved candidate.
+An unverifiable PR author, partial GitHub API errors, requested changes, and
+unresolved threads block integration even when review is optional.
 Missing or ambiguous state, failed checks, unresolved review threads, changed
 approved content, and conflicts block the operation. Repository configuration
 classifies checks that require separate authorization. The current remote
@@ -36,3 +37,15 @@ CLI grants permission to bypass them.
 GitHub's merge API can atomically match the PR head but does not bind the
 base SHA or review state. Server-side protections are needed to close races
 between the final checks and the merge request.
+
+For this repository, the configured CI requirement is the
+`lifecycle-verify` pull-request job running `./scripts/verify`; an independent
+GitHub review is required. Configuration alone does not establish server-side
+branch protection. The initial workflow and its reported check name require a
+real GitHub integration exercise.
+
+The initial integration is intended as a combined Increment 1 and Increment 2
+PR against `develop`. Increment 1's earlier approval did not authorize its
+integration; the combined candidate requires its own explicit integration
+authorization after review. The separate Increment 1 feature branch is not
+automatically deleted by the combined integration.

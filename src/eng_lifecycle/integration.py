@@ -33,7 +33,7 @@ from .gitops import (
 PR_FIELDS = (
     "number,state,baseRefName,baseRefOid,headRefName,headRefOid,"
     "isCrossRepository,isDraft,mergeable,mergeStateStatus,mergeCommit,"
-    "reviewDecision,statusCheckRollup,url"
+    "reviewDecision,statusCheckRollup,url,author"
 )
 
 
@@ -62,9 +62,14 @@ def gh(root: Path, args: list[str]) -> str:
 
 def gh_json(root: Path, args: list[str]) -> object:
     try:
-        return json.loads(gh(root, args))
+        result = json.loads(gh(root, args))
     except json.JSONDecodeError as error:
         raise LifecycleError("GitHub returned invalid JSON") from error
+    if isinstance(result, dict) and "errors" in result:
+        errors = result["errors"]
+        if not isinstance(errors, list) or errors:
+            raise LifecycleError("GitHub returned errors; state cannot be verified")
+    return result
 
 
 def origin_repository(root: Path) -> tuple[str, str, str]:
@@ -172,12 +177,23 @@ def pull_request(root: Path, repository: str, number: int) -> dict[str, object]:
     return result
 
 
+def pr_author(pr: dict[str, object]) -> str:
+    author = pr.get("author")
+    if not isinstance(author, dict):
+        raise LifecycleError("Pull request author cannot be verified")
+    login = author.get("login")
+    if not isinstance(login, str) or not login.strip():
+        raise LifecycleError("Pull request author cannot be verified")
+    return login
+
+
 def validate_pr(
     pr: dict[str, object], branch: str, base: str, candidate: str | None
 ) -> int:
     number = pr.get("number")
     if type(number) is not int or number < 1:
         raise LifecycleError("Invalid pull request number")
+    pr_author(pr)
     for field in ("baseRefOid", "headRefOid"):
         oid = pr.get(field)
         if not isinstance(oid, str) or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", oid):
@@ -246,7 +262,7 @@ def unresolved_threads(root: Path, host: str, owner: str, name: str, number: int
 
 def validate_review_opinions(
     root: Path, host: str, owner: str, name: str, number: int,
-    candidate: str, required: bool,
+    candidate: str, required: bool, pr_author: str,
 ) -> None:
     query = (
         "query($owner:String!,$name:String!,$number:Int!,$cursor:String) {"
@@ -296,7 +312,7 @@ def validate_review_opinions(
                     or not login.strip()
                 ):
                     raise LifecycleError("Approval review has no commit or author")
-                if oid == candidate:
+                if oid == candidate and login.casefold() != pr_author.casefold():
                     approved = True
             elif state != "DISMISSED":
                 raise LifecycleError("Unknown pull request review state")
@@ -307,7 +323,7 @@ def validate_review_opinions(
         seen.add(end_cursor)
         cursor = end_cursor
     if required and not approved:
-        raise LifecycleError("No approving GitHub review is bound to the approved candidate")
+        raise LifecycleError("No independent approving GitHub review is bound to the approved candidate")
 
 
 def required_checks(pr: dict[str, object], names: list[str]) -> str:
@@ -409,7 +425,9 @@ def ensure_ready(
                 host, owner, name = identity
                 if unresolved_threads(root, host, owner, name, number):
                     raise LifecycleError("Pull request has unresolved review threads")
-                validate_review_opinions(root, host, owner, name, number, candidate, review_required)
+                validate_review_opinions(
+                    root, host, owner, name, number, candidate, review_required, pr_author(pr)
+                )
                 return pr
         if time.monotonic() >= deadline:
             raise LifecycleError("Timed out waiting for all required CI checks")
@@ -601,7 +619,9 @@ def integrate_locked(root: Path, branch: str, args: argparse.Namespace) -> int:
         raise LifecycleError("Pull request is no longer mergeable")
     if unresolved_threads(root, *identity, number):
         raise LifecycleError("Pull request has unresolved review threads")
-    validate_review_opinions(root, *identity, number, candidate, review_required)
+    validate_review_opinions(
+        root, *identity, number, candidate, review_required, pr_author(latest)
+    )
     if origin_repository(root) != identity:
         raise LifecycleError("Origin repository changed during integration")
     if check_base(root, config, candidate) != base_oid:

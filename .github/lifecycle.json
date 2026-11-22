@@ -16,7 +16,8 @@
   "integration_gate": {
     "commands": []
   },
-  "required_ci": [],
+  "required_ci": ["lifecycle-verify"],
+  "required_review": true,
   "special_authorization": [
     "database",
     "docker",

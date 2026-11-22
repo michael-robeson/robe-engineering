@@ -175,13 +175,17 @@ criteria. No new source commit is created after approval.
 Each target repository must configure a nonempty `required_ci` array and an
 explicit `required_review` boolean in `.github/lifecycle.json`. A true
 review policy requires an approving GitHub review of the exact approved
-candidate; false permits no review but still blocks changes requested,
-GitHub-required reviews, and unresolved
+candidate by someone other than the PR author; false permits no review but
+still blocks changes requested, GitHub-required reviews, and unresolved
 review threads. All named CI checks must succeed; missing, skipped, failed,
 ambiguous, or pending checks never count as a pass. Checks needing separate
-authorization still require the appropriate `--authorize` category. The
-current catalog repository does not yet configure required CI or a review
-policy, so its own integration is blocked until those are decided.
+authorization still require the appropriate `--authorize` category. This
+repository requires the `lifecycle-verify` GitHub Actions job, which runs
+`./scripts/verify` on pull requests targeting `develop`, and an independent
+GitHub approval. This configuration is enforced by the CLI; it does not
+itself configure GitHub branch protection. The workflow and check name still
+need verification in a real pull request. If the required review is not yet
+available, integration stops; use `resume` after the independent review.
 
 The remote base must remain an ancestor of the approved candidate. Local base
 divergence, changed approval bindings, conflicting PRs, and changed branch
@@ -194,3 +198,14 @@ permissions and GitHub authentication remain separate prerequisites.
 Integration uses a per-feature lock shared by worktrees; the lock is released
 when the process exits, including after interruption. This implementation
 requires POSIX file locking.
+
+### Bootstrap integration
+
+The initial integration candidate is stacked on the unmerged Increment 1
+candidate. The intended first PR targets `develop` and includes both
+increments, including the CI and policy configuration. Before creating that
+PR, the user must explicitly approve integration of the reviewed combined
+candidate; the earlier Increment 1 approval did not authorize integration.
+If the base or candidate changes, produce new readiness evidence and obtain
+new approval. The separate Increment 1 branch is not the combined PR's
+feature branch and is not automatically cleaned up by this integration.
