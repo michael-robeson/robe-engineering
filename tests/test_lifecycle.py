@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import io
 import json
 import os
 import shutil
 import subprocess
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
 from eng_lifecycle.cli import main
+from eng_lifecycle.config import load_config
 from eng_lifecycle.evidence import sha256_bytes
 from eng_lifecycle.gitops import git_dir
 
@@ -248,6 +251,93 @@ class LifecycleTest(unittest.TestCase):
             ),
             1,
         )
+
+    def change_policy_only(self, criteria: Path) -> None:
+        commit = run("git", "rev-parse", "HEAD", cwd=self.repo).stdout
+        tree = run("git", "rev-parse", "HEAD^{tree}", cwd=self.repo).stdout
+        criteria_bytes = criteria.read_bytes()
+        policy = load_config(self.repo).policy_bytes()
+        self.write_config('python3 -c "print(\'changed policy\')"')
+        self.assertNotEqual(load_config(self.repo).policy_bytes(), policy)
+        self.assertEqual(run("git", "rev-parse", "HEAD", cwd=self.repo).stdout, commit)
+        self.assertEqual(run("git", "rev-parse", "HEAD^{tree}", cwd=self.repo).stdout, tree)
+        self.assertEqual(criteria.read_bytes(), criteria_bytes)
+
+    def test_policy_only_drift_blocks_approval_of_existing_readiness(self) -> None:
+        self.assertEqual(self.start(), 0)
+        self.assertEqual(self.commit(), 0)
+        result, criteria = self.review()
+        self.assertEqual(result, 0)
+        directory = next((git_dir(self.repo) / "engineering-lifecycle").iterdir())
+        evidence = (directory / "evidence.json").read_bytes()
+        review = (directory / "review.json").read_bytes()
+        self.change_policy_only(criteria)
+        error = io.StringIO()
+        with redirect_stderr(error):
+            self.assertEqual(self.approve(criteria), 2)
+        self.assertIn("quality policy changed", error.getvalue())
+        self.assertEqual((directory / "evidence.json").read_bytes(), evidence)
+        self.assertEqual((directory / "review.json").read_bytes(), review)
+        self.assertFalse((directory / "approval.json").exists())
+
+    def test_policy_only_drift_invalidates_existing_approval_status(self) -> None:
+        self.assertEqual(self.start(), 0)
+        self.assertEqual(self.commit(), 0)
+        result, criteria = self.review()
+        self.assertEqual(result, 0)
+        self.assertEqual(self.approve(criteria), 0)
+        self.change_policy_only(criteria)
+        output = io.StringIO()
+        with redirect_stdout(output):
+            result = main([
+                "status", "--repo", str(self.repo), "--feature", "increment-one",
+                "--criteria-file", str(criteria),
+            ])
+        self.assertEqual(result, 1)
+        status = json.loads(output.getvalue())
+        self.assertFalse(status["valid"])
+        self.assertIn("quality policy changed", status["reasons"][0])
+
+    def test_dirty_worktree_still_blocks_approval_after_evidence_validation(self) -> None:
+        self.assertEqual(self.start(), 0)
+        self.assertEqual(self.commit(), 0)
+        result, criteria = self.review()
+        self.assertEqual(result, 0)
+        (self.repo / "dirty.txt").write_text("dirty", encoding="utf-8")
+        error = io.StringIO()
+        with redirect_stderr(error):
+            self.assertEqual(self.approve(criteria), 2)
+        self.assertIn("worktree is dirty", error.getvalue().lower())
+        self.assertFalse(list((git_dir(self.repo) / "engineering-lifecycle").rglob("approval.json")))
+
+    def test_policy_drift_is_reported_before_changed_base(self) -> None:
+        self.assertEqual(self.start(), 0)
+        self.assertEqual(self.commit(), 0)
+        result, criteria = self.review()
+        self.assertEqual(result, 0)
+        self.assertEqual(self.approve(criteria), 0)
+        commit = run("git", "rev-parse", "HEAD", cwd=self.repo).stdout
+        tree = run("git", "rev-parse", "HEAD^{tree}", cwd=self.repo).stdout
+        criteria_bytes = criteria.read_bytes()
+        path = self.repo / ".github" / "lifecycle.json"
+        policy = json.loads(path.read_text(encoding="utf-8"))
+        policy["base"] = "other-base"
+        path.write_text(json.dumps(policy), encoding="utf-8")
+        self.assertEqual(run("git", "rev-parse", "HEAD", cwd=self.repo).stdout, commit)
+        self.assertEqual(run("git", "rev-parse", "HEAD^{tree}", cwd=self.repo).stdout, tree)
+        self.assertEqual(criteria.read_bytes(), criteria_bytes)
+        error = io.StringIO()
+        with redirect_stderr(error):
+            self.assertEqual(self.approve(criteria), 2)
+        self.assertIn("quality policy changed", error.getvalue())
+        output = io.StringIO()
+        with redirect_stdout(output):
+            result = main([
+                "status", "--repo", str(self.repo), "--feature", "increment-one",
+                "--criteria-file", str(criteria),
+            ])
+        self.assertEqual(result, 1)
+        self.assertIn("quality policy changed", json.loads(output.getvalue())["reasons"][0])
 
     def test_invalid_approval_record_is_rejected(self) -> None:
         self.assertEqual(self.start(), 0)

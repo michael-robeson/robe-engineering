@@ -221,6 +221,11 @@ def validate_evidence(
         (directory / "evidence.json").read_bytes()
     ):
         raise LifecycleError("Review and evidence hashes do not match")
+    if (
+        review.get("quality_policy_sha256") != expected.get("quality_policy_sha256")
+        or evidence.get("quality_policy_sha256") != expected.get("quality_policy_sha256")
+    ):
+        raise LifecycleError("Review or evidence quality policy changed")
     for key, value in expected.items():
         if review.get(key) != value or evidence.get(key) != value:
             raise LifecycleError(f"Review or evidence does not match current {key}")
@@ -414,7 +419,6 @@ def cmd_approve(args: argparse.Namespace) -> int:
         raise LifecycleError("Approval message must be exactly APPROVED")
     branch = feature_branch(root, config.feature_prefix, args.feature)
     ensure_no_git_operation(root)
-    ensure_clean(root)
     candidate = head_commit(root)
     tree = candidate_tree(root)
     criteria, criteria_hash = read_criteria(args)
@@ -431,6 +435,7 @@ def cmd_approve(args: argparse.Namespace) -> int:
         "quality_policy_sha256": policy_hash,
     }
     validate_evidence(config, directory, expected)
+    ensure_clean(root)
 
     review_bytes = (directory / "review.json").read_bytes()
     evidence_bytes = (directory / "evidence.json").read_bytes()
@@ -489,8 +494,6 @@ def cmd_status(args: argparse.Namespace) -> int:
     dirty = dirty_porcelain(root)
     try:
         ensure_no_git_operation(root)
-        if dirty:
-            raise LifecycleError("worktree is dirty")
         criteria, criteria_hash = read_criteria(args)
         expected: dict[str, object] = {
             "repository": str(root),
@@ -501,9 +504,13 @@ def cmd_status(args: argparse.Namespace) -> int:
             "acceptance_criteria_sha256": criteria_hash,
             "quality_policy_sha256": sha256_bytes(config.policy_bytes()),
         }
+        if record.get("quality_policy_sha256") != expected["quality_policy_sha256"]:
+            raise LifecycleError("Approval quality policy changed")
         for key, value in expected.items():
             if record.get(key) != value:
                 raise LifecycleError(f"Approval does not match current {key}")
+        if dirty:
+            raise LifecycleError("worktree is dirty")
         validate_evidence(config, directory, {**expected, "acceptance_criteria": criteria})
     except (LifecycleError, GitError, OSError, UnicodeError) as error:
         reasons.append(str(error))

@@ -109,4 +109,6 @@ not proof of identity. Approval and status require the same acceptance
 criteria and validate the current review, complete check evidence, candidate,
 and policy. A successful rerun with the same binding need not invalidate
 approval merely because timing or other incidental evidence changed.
+Policy drift is reported even when the changed policy file makes the worktree
+dirty; approval still requires a clean worktree.
 This increment does not create, merge, or clean up pull requests.
