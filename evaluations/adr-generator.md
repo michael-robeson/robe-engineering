@@ -1,8 +1,9 @@
 # Evaluation: ADR Generator
 
-- **Status:** evaluating; personal adoption remains unapproved.
-- **Recommendation:** restrict the installed candidate to a controlled trial;
-  broader personal adoption remains unapproved.
+- **Status:** adopted for personal use.
+- **Recommendation:** use the adapted candidate for personal ADR drafting,
+  while retaining repository instructions and explicit authorization for
+  accepted status.
 - **Reviewed:** 2026-11-21.
 
 ## Provenance
@@ -202,33 +203,66 @@ VS Code Local or a guarantee of consistent reasoning.
 
 ## VS Code Copilot Local validation
 
-**Not completed; blocking requirement remains.** Available browser-page tools
-do not expose the VS Code desktop's Copilot Local chat, agent picker, or
-response stream. Copilot CLI can select the personal candidate, but it is a
-different harness and does not satisfy this validation request. The candidate
-was not copied into Local's profile storage, and no Local discovery or
-invocation is claimed. A user-driven Local session or suitable desktop
-control is required to verify discovery and exercise a draft there.
+A successful fresh VS Code Copilot Local trial was completed for
+ADR-0005, Dead-Letter Remediation and Replay. The session discovered and
+invoked the personal candidate and produced a Proposed ADR draft in the
+disposable Robe Event Platform worktree. The result was not promoted,
+accepted, or merged. A retained session identifier and complete desktop
+transcript were not available in the catalog evidence, so this record does
+not infer behavior beyond the observed trial.
 
-The VS Code reference states that Local user agents are stored in VS Code
-profile storage, separate from `~/.copilot/agents/`; the candidate currently
-exists only in the latter CLI location. The same reference says the Local
-harness is deprecated and scheduled for removal in February 2027. See the
-[custom agent file reference](https://code.visualstudio.com/docs/agents/reference/custom-agent-file-reference).
+The trial retained the distinction between accepted architectural direction,
+implemented capabilities, tested behavior, and proposed functionality:
+
+- **Accepted direction:** ADR-0002 establishes at-least-once delivery,
+  independent push consumers, bounded retries, and a dead-letter topic
+  approach. Its thresholds, ownership, visibility, replay, and operational
+  procedures remain open.
+- **Implemented capability:** the local Compose Pub/Sub bootstrap creates
+  the topic and push subscriptions but does not configure a dead-letter
+  policy. The item and audit consumers provide HTTP acknowledgment and
+  idempotent persistence, but no remediation or replay implementation.
+- **Tested behavior:** end-to-end tests verify retry after a database outage,
+  duplicate-safe redelivery after a lost post-commit response, and independent
+  consumer outcomes. They do not exercise Pub/Sub dead-letter forwarding or
+  replay.
+- **Proposed functionality:** ADR-0005 proposes human-controlled,
+  consumer-scoped diagnosis and replay principles. It remains Proposed and
+  was not implemented.
+
+The trial also preserved unresolved architecture questions: dead-letter topic
+and subscription ownership; maximum delivery attempts and backoff; alert and
+retention thresholds; remediation and replay authorization; replay tooling;
+handling permanently unprocessable events and missed forwarding; sensitive
+payload controls; environment differences; and cloud integration validation.
+The local Pub/Sub emulator does not establish production GCP or Cloud SQL
+behavior.
+
+This result verifies the candidate in VS Code Copilot Local for this single
+trial. It is not proof of all future responses, and it does not establish
+unrestricted write safety, interactive approval behavior, or discovery in
+every future profile or VS Code/Copilot configuration.
+
+The VS Code reference states that Local user agents use VS Code profile
+storage, separate from `~/.copilot/agents/`; the candidate also has a Copilot
+CLI location. The harness's planned deprecation makes future availability
+uncertain. Keep the agent source canonical in this repository and preserve
+the upstream attribution and adapted revision.
 
 ## Placement and next steps
 
-Keep the candidate evaluating. The Copilot CLI trial installation is
-available beyond the controlled trial, but is not approved for unrestricted
-use. The revised evidence guidance passed one additional Copilot CLI sample.
-Before broader adoption, still verify discovery and invocation in VS Code
-Copilot Local, exercise interactive approval and additional real repository
-conventions, and review the trial draft's technical correctness. Recheck
-upstream changes and preserve attribution when distributing an adaptation.
+Adopt the candidate for personal use while keeping repository instructions,
+accepted decisions, and explicit authorization authoritative. The canonical
+adapted source is `~/Projects/robe-engineering/agents/adr-generator.agent.md`;
+the upstream MIT attribution is preserved alongside it. Controlled personal
+installations are recorded at `~/.copilot/agents/portable-adr-generator.agent.md`
+and `~/.copilot/agents/ADR-GENERATOR-LICENSE`.
+
+Verified environments are Copilot CLI and VS Code Copilot Local. The evidence
+records a Copilot CLI discovery and drafting trial and a successful VS Code
+Copilot Local ADR-0005 trial. It does not claim verification of write safety
+in other harnesses or of every repository convention.
 
 For the Copilot harness in VS Code, the documented personal agent location is
 `~/.copilot/agents/` on the machine running the agent
 ([VS Code custom-agent reference](https://code.visualstudio.com/docs/agents/reference/custom-agent-file-reference)).
-The separate VS Code Local harness uses profile storage. Its discovery and
-invocation remain unverified; the harness's planned deprecation also makes
-it a short-lived target for adoption.
