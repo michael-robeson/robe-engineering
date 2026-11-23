@@ -4,9 +4,10 @@ import argparse
 import json
 import re
 import subprocess
-import time
+import uuid
 from contextlib import contextmanager
 from pathlib import Path
+from time import monotonic, sleep
 from typing import Iterator
 from urllib.parse import urlsplit
 
@@ -409,7 +410,7 @@ def ensure_ready(
     root: Path, repository: str, identity: tuple[str, str, str], number: int,
     branch: str, base: str, candidate: str, required: list[str], review_required: bool,
 ) -> dict[str, object]:
-    deadline = time.monotonic() + 600
+    deadline = monotonic() + 600
     while True:
         pr = pull_request(root, repository, number)
         if validate_pr(pr, branch, base, candidate) != number:
@@ -431,9 +432,9 @@ def ensure_ready(
                     root, host, owner, name, number, candidate, review_required, pr_author(pr)
                 )
                 return pr
-        if time.monotonic() >= deadline:
+        if monotonic() >= deadline:
             raise LifecycleError("Timed out waiting for all required CI checks")
-        time.sleep(10)
+        sleep(10)
 
 
 def remote_feature_tip(root: Path, branch: str) -> str | None:
@@ -447,6 +448,134 @@ def remote_feature_tip(root: Path, branch: str) -> str | None:
     if len(fields) != 2 or fields[1] != f"refs/heads/{branch}":
         raise LifecycleError("Invalid remote feature branch response")
     return fields[0]
+
+
+def post_integration_record(
+    root: Path,
+    config: LifecycleConfig,
+    source_branch: str,
+    candidate: str,
+    merge_oid: str,
+) -> tuple[str, str] | None:
+    path = storage(root, source_branch) / "post-integration.json"
+    if not path.is_file():
+        return None
+    record = read_json(path)
+    if (
+        type(record.get("schema")) is not int
+        or record.get("schema") != 1
+        or record.get("source_branch") != source_branch
+        or record.get("candidate_commit") != candidate
+        or record.get("merge_commit") != merge_oid
+        or record.get("base") != config.base
+    ):
+        raise LifecycleError("Post-integration recovery state does not match the merge")
+    base_commit = record.get("base_commit")
+    working_branch = record.get("working_branch")
+    if not isinstance(base_commit, str) or not re.fullmatch(
+        r"[0-9a-f]{40}|[0-9a-f]{64}", base_commit
+    ):
+        raise LifecycleError("Invalid post-integration base commit")
+    if not isinstance(working_branch, str) or not re.fullmatch(
+        re.escape(config.feature_prefix) + r"next-[0-9a-f]{32}", working_branch
+    ):
+        raise LifecycleError("Invalid post-integration working branch")
+    run_git(root, ["check-ref-format", "--branch", working_branch])
+    return working_branch, base_commit
+
+
+def recover_post_integration_branch(
+    root: Path,
+    config: LifecycleConfig,
+    source_branch: str,
+    working_branch: str,
+    base_commit: str,
+) -> str:
+    ensure_no_git_operation(root)
+    ensure_clean(root)
+    source_ref = run_git(
+        root,
+        ["show-ref", "--verify", "--quiet", f"refs/heads/{source_branch}"],
+        check=False,
+    )
+    if source_ref.returncode == 0:
+        raise LifecycleError("Integrated feature branch unexpectedly exists locally")
+    if source_ref.returncode != 1:
+        raise LifecycleError("Unable to inspect integrated feature branch")
+    if remote_feature_tip(root, source_branch) is not None:
+        raise LifecycleError("Integrated feature branch unexpectedly exists on origin")
+    current = current_branch(root)
+    if current not in (config.base, working_branch):
+        raise LifecycleError(
+            "Post-integration recovery will not switch away from the current branch"
+        )
+    local_ref = run_git(
+        root,
+        ["show-ref", "--verify", "--quiet", f"refs/heads/{working_branch}"],
+        check=False,
+    )
+    if local_ref.returncode == 0:
+        tip = run_git(root, ["rev-parse", f"refs/heads/{working_branch}"]).stdout.strip()
+        if tip != base_commit:
+            raise LifecycleError(
+                "Post-integration working branch changed; refusing to switch to it"
+            )
+        if remote_feature_tip(root, working_branch) is not None:
+            raise LifecycleError(
+                "Post-integration working branch unexpectedly exists on origin"
+            )
+        if current == config.base:
+            run_git(root, ["switch", working_branch])
+        return working_branch
+    if local_ref.returncode != 1:
+        raise LifecycleError("Unable to inspect post-integration working branch")
+    if current != config.base or head_commit(root) != base_commit:
+        raise LifecycleError(
+            "Cannot recover post-integration branch from the recorded base commit"
+        )
+    if remote_feature_tip(root, working_branch) is not None:
+        raise LifecycleError(
+            "Post-integration working branch unexpectedly exists on origin"
+        )
+    run_git(root, ["switch", "-c", working_branch])
+    return working_branch
+
+
+def create_post_integration_branch(
+    root: Path,
+    config: LifecycleConfig,
+    source_branch: str,
+    candidate: str,
+    merge_oid: str,
+) -> str:
+    base_commit = head_commit(root)
+    for _ in range(10):
+        working_branch = f"{config.feature_prefix}next-{uuid.uuid4().hex}"
+        run_git(root, ["check-ref-format", "--branch", working_branch])
+        local_ref = run_git(
+            root,
+            ["show-ref", "--verify", "--quiet", f"refs/heads/{working_branch}"],
+            check=False,
+        )
+        if local_ref.returncode == 0:
+            continue
+        if local_ref.returncode != 1:
+            raise LifecycleError("Unable to inspect generated working branch")
+        if remote_feature_tip(root, working_branch) is not None:
+            continue
+        record: dict[str, object] = {
+            "schema": 1,
+            "source_branch": source_branch,
+            "candidate_commit": candidate,
+            "merge_commit": merge_oid,
+            "base": config.base,
+            "base_commit": base_commit,
+            "working_branch": working_branch,
+        }
+        write_json(storage(root, source_branch) / "post-integration.json", record)
+        run_git(root, ["switch", "-c", working_branch])
+        return working_branch
+    raise LifecycleError("Unable to allocate a unique post-integration branch")
 
 
 def check_base(root: Path, config: LifecycleConfig, candidate: str) -> str:
@@ -466,7 +595,7 @@ def cleanup(
     root: Path, config: LifecycleConfig, branch: str, candidate: str,
     pr: dict[str, object], identity: tuple[str, str, str], args: argparse.Namespace,
     binding: tuple[str, str, list[str], str],
-) -> None:
+) -> str:
     ensure_binding(root, branch, args, binding)
     merge = pr.get("mergeCommit")
     if pr.get("state") != "MERGED" or not isinstance(merge, dict):
@@ -476,6 +605,11 @@ def cleanup(
         raise LifecycleError("Pull request has no valid merge commit")
     if origin_repository(root) != identity:
         raise LifecycleError("Origin repository changed before cleanup")
+    record = post_integration_record(root, config, branch, candidate, merge_oid)
+    if record is not None:
+        return recover_post_integration_branch(
+            root, config, branch, *record
+        )
     run_git(root, ["fetch", "origin", config.base])
     remote_base = "FETCH_HEAD"
     for commit in (merge_oid, candidate):
@@ -528,6 +662,9 @@ def cleanup(
         run_git(root, ["branch", "-d", branch])
     elif local_ref.returncode != 1:
         raise LifecycleError("Unable to inspect local feature branch")
+    return create_post_integration_branch(
+        root, config, branch, candidate, merge_oid
+    )
 
 
 @contextmanager
@@ -570,18 +707,25 @@ def integrate_locked(root: Path, branch: str, args: argparse.Namespace) -> int:
     identity = origin_repository(root)
     repository = "/".join(identity)
     current = current_branch(root)
-    if current not in (branch, config.base):
-        raise LifecycleError("Integration requires the feature or base branch")
     pr = find_pr(root, repository, branch)
     if pr is not None:
         number = validate_pr(pr, branch, config.base, None)
         if pr.get("state") == "MERGED":
             validate_pr(pr, branch, config.base, candidate)
-            cleanup(root, config, branch, candidate, pr, identity, args, binding)
-            print(json_text({"integrated": True, "candidate_commit": candidate, "pr": number}))
+            working_branch = cleanup(
+                root, config, branch, candidate, pr, identity, args, binding
+            )
+            print(json_text({
+                "integrated": True,
+                "candidate_commit": candidate,
+                "pr": number,
+                "working_branch": working_branch,
+            }))
             return 0
         if pr.get("state") != "OPEN":
             raise LifecycleError("Existing pull request is not open")
+    if current not in (branch, config.base):
+        raise LifecycleError("Integration requires the feature or base branch")
     if current != branch or head_commit(root) != candidate:
         raise LifecycleError("Unmerged integration requires the approved feature branch")
     base_oid = check_base(root, config, candidate)
@@ -636,6 +780,13 @@ def integrate_locked(root: Path, branch: str, args: argparse.Namespace) -> int:
     merged = pull_request(root, repository, number)
     if validate_pr(merged, branch, config.base, candidate) != number:
         raise LifecycleError("Pull request identity changed after merge")
-    cleanup(root, config, branch, candidate, merged, identity, args, binding)
-    print(json_text({"integrated": True, "candidate_commit": candidate, "pr": number}))
+    working_branch = cleanup(
+        root, config, branch, candidate, merged, identity, args, binding
+    )
+    print(json_text({
+        "integrated": True,
+        "candidate_commit": candidate,
+        "pr": number,
+        "working_branch": working_branch,
+    }))
     return 0

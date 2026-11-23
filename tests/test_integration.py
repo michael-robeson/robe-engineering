@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from eng_lifecycle.cli import main
@@ -185,20 +186,114 @@ class IntegrationTest(unittest.TestCase):
     def remote_feature(self) -> str:
         return git(self.repo, "ls-remote", "--heads", "origin", "refs/heads/feature/example")
 
+    def working_branch(self, output: str) -> str:
+        result = json.loads(output)
+        branch = result["working_branch"]
+        self.assertRegex(branch, r"^feature/next-[0-9a-f]{32}$")
+        return branch
+
     def test_integration_merges_synchronizes_and_cleans_up(self) -> None:
         self.approve()
         result, output = self.call()
         self.assertEqual(result, 0, output)
         self.assertEqual(self.fake.created, 1)
         self.assertEqual(self.fake.merged, 1)
-        self.assertEqual(git(self.repo, "branch", "--show-current"), "develop")
+        working_branch = self.working_branch(output)
+        self.assertEqual(git(self.repo, "branch", "--show-current"), working_branch)
         self.assertEqual(self.remote_feature(), "")
         self.assertEqual(git(self.repo, "branch", "--list", "feature/example"), "")
+        self.assertNotEqual(git(self.repo, "branch", "--list", working_branch), "")
+        self.assertEqual(
+            git(self.repo, "ls-remote", "--heads", "origin", f"refs/heads/{working_branch}"),
+            "",
+        )
         git(self.repo, "merge-base", "--is-ancestor", self.candidate, "HEAD")
         result, output = self.call("resume")
         self.assertEqual(result, 0, output)
+        self.assertEqual(self.working_branch(output), working_branch)
         self.assertEqual(self.fake.created, 1)
         self.assertEqual(self.fake.merged, 1)
+
+    def test_resume_after_working_branch_creation_interruption_reuses_branch(self) -> None:
+        self.approve()
+        original = run_git
+        interrupted = False
+
+        def create_then_interrupt(root: Path, args: list[str], **kwargs):
+            nonlocal interrupted
+            result = original(root, args, **kwargs)
+            if (
+                not interrupted
+                and args[:2] == ["switch", "-c"]
+                and args[2].startswith("feature/next-")
+            ):
+                interrupted = True
+                raise LifecycleError("interrupted after working branch creation")
+            return result
+
+        with patch("eng_lifecycle.integration.run_git", side_effect=create_then_interrupt):
+            result, output = self.call()
+        self.assertEqual(result, 2)
+        self.assertIn("interrupted", output)
+        working_branch = git(self.repo, "branch", "--show-current")
+        self.assertRegex(working_branch, r"^feature/next-[0-9a-f]{32}$")
+        result, output = self.call("resume")
+        self.assertEqual(result, 0, output)
+        self.assertEqual(self.working_branch(output), working_branch)
+        self.assertEqual(
+            git(
+                self.repo,
+                "branch",
+                "--format=%(refname:short)",
+                "--list",
+                "feature/next-*",
+            ).splitlines(),
+            [working_branch],
+        )
+
+    def test_generated_branch_collision_retries_without_overwriting(self) -> None:
+        self.approve()
+        local_collision = "a" * 32
+        remote_collision = "b" * 32
+        selected = "c" * 32
+        local_branch = f"feature/next-{local_collision}"
+        remote_branch = f"feature/next-{remote_collision}"
+        git(self.repo, "branch", local_branch, "develop")
+        local_tip = git(self.repo, "rev-parse", f"refs/heads/{local_branch}")
+        git(self.repo, "push", "origin", f"develop:refs/heads/{remote_branch}")
+        remote_tip = git(self.repo, "ls-remote", "--heads", "origin", f"refs/heads/{remote_branch}").split()[0]
+        generated = iter((local_collision, remote_collision, selected))
+        with patch(
+            "eng_lifecycle.integration.uuid.uuid4",
+            side_effect=lambda: SimpleNamespace(hex=next(generated)),
+        ):
+            result, output = self.call()
+        self.assertEqual(result, 0, output)
+        self.assertEqual(self.working_branch(output), f"feature/next-{selected}")
+        self.assertEqual(
+            git(self.repo, "rev-parse", f"refs/heads/{local_branch}"),
+            local_tip,
+        )
+        self.assertEqual(
+            git(self.repo, "ls-remote", "--heads", "origin", f"refs/heads/{remote_branch}").split()[0],
+            remote_tip,
+        )
+
+    def test_resume_does_not_replace_work_on_generated_branch(self) -> None:
+        self.approve()
+        result, output = self.call()
+        self.assertEqual(result, 0, output)
+        working_branch = self.working_branch(output)
+        (self.repo / "later.txt").write_text("keep this work\n", encoding="utf-8")
+        git(self.repo, "add", "later.txt")
+        git(self.repo, "commit", "-m", "Work after integration")
+        work_commit = git(self.repo, "rev-parse", "HEAD")
+        result, output = self.call("resume")
+        self.assertEqual(result, 2)
+        self.assertIn("working branch changed", output)
+        self.assertEqual(git(self.repo, "branch", "--show-current"), working_branch)
+        self.assertEqual(git(self.repo, "rev-parse", "HEAD"), work_commit)
+        self.assertEqual((self.repo / "later.txt").read_text(encoding="utf-8"), "keep this work\n")
 
     def test_no_approval_blocks_all_remote_actions(self) -> None:
         result, output = self.call()
@@ -314,7 +409,7 @@ class IntegrationTest(unittest.TestCase):
         self.fake.create_pr()
         assert self.fake.pr is not None
         self.fake.pr["statusCheckRollup"] = []
-        with patch("eng_lifecycle.integration.time.monotonic", side_effect=itertools.count(0, 1000)):
+        with patch("eng_lifecycle.integration.monotonic", side_effect=itertools.count(0, 1000)):
             result, output = self.call()
         self.assertEqual(result, 2)
         self.assertIn("Timed out", output)
@@ -343,7 +438,7 @@ class IntegrationTest(unittest.TestCase):
             return original(root, args)
 
         with patch("eng_lifecycle.integration.gh", side_effect=eventually_ready), \
-                patch("eng_lifecycle.integration.time.sleep") as sleep:
+                patch("eng_lifecycle.integration.sleep") as sleep:
             result, output = self.call()
         self.assertEqual(result, 0, output)
         self.assertEqual(sleep.call_count, 2)

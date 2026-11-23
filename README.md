@@ -168,9 +168,13 @@ candidate. They validate the existing approval and evidence, run readiness
 and integration checks, push the approved commit, create or update its PR,
 wait up to ten minutes for required CI, and check review threads and merge
 eligibility. They merge only with a matching PR head, then synchronize the
-local base and safely delete the merged feature branch. `resume` reconstructs
-state from Git and GitHub after interruption; it uses the same approval and
-criteria. No new source commit is created after approval.
+local base and safely delete the merged feature branch. After cleanup, the CLI
+creates a collision-resistant, local-only branch using the configured feature
+prefix and a UUID4 identifier, from the synchronized base, and reports its
+name; no scope or branch name is requested. `resume` reconstructs state from
+Git and GitHub after interruption and reuses the same generated branch; it
+uses the same approval and criteria. No new source commit is created after
+approval.
 
 Each target repository must configure a nonempty `required_ci` array and an
 explicit `required_review` boolean in `.github/lifecycle.json`. A true
