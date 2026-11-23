@@ -51,3 +51,20 @@ PR against `develop`. Increment 1's earlier approval did not authorize its
 integration; the combined candidate requires its own explicit integration
 authorization after review. The separate Increment 1 feature branch is not
 automatically deleted by the combined integration.
+
+After a verified merge, synchronization, and safe cleanup of the integrated
+feature branch, the CLI creates a new local-only working branch from the
+synchronized base. Its name is `feature/next-<uuid4-hex>` (using the
+repository-configured feature prefix), so users do not need to supply a scope
+or branch name for this disposable branch. The UUID provides collision
+resistance; the CLI also checks local and remote refs and never overwrites an
+existing branch or pushes the new one.
+
+The CLI records the generated name and synchronized base commit in Git
+metadata before creating the branch. `resume` reuses that record after an
+interruption, returns the same branch after successful creation, and refuses
+to switch away from unrelated work or to reuse a branch whose tip has changed.
+This keeps branch creation idempotent without weakening the existing merge,
+base-synchronization, or branch-cleanup checks. Creating this local branch does
+not authorize commits, publishing, pull-request creation, approval, or further
+integration.
