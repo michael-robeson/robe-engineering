@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
@@ -66,28 +68,47 @@ def cmd_start(args: argparse.Namespace) -> int:
     config = load_config(root)
     ensure_no_git_operation(root)
     ensure_clean(root)
-    if current_branch(root) != config.base:
-        raise LifecycleError(f"Start requires checkout of {config.base}")
-    branch = branch_name(args.feature, config.feature_prefix)
-    run_git(root, ["check-ref-format", "--branch", branch])
-    existing = run_git(
-        root,
-        ["show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
-        check=False,
-    )
-    if existing.returncode == 0:
-        raise LifecycleError(f"Feature branch already exists: {branch}")
-    if existing.returncode != 1:
-        raise LifecycleError("Unable to determine whether the feature branch exists")
+    branch = current_branch(root)
+    generated_pattern = re.escape(config.feature_prefix) + r"next-[0-9a-f]{32}"
+    if re.fullmatch(generated_pattern, branch):
+        remote = run_git(
+            root, ["ls-remote", "--heads", "origin", f"refs/heads/{branch}"]
+        )
+        if remote.stdout.strip():
+            raise LifecycleError("Generated working branch is not local-only")
+        print(json_text({"repository": str(root), "branch": branch, "base": config.base}))
+        return 0
+    if branch != config.base:
+        raise LifecycleError(
+            f"Start requires checkout of {config.base} or a generated disposable feature branch"
+        )
     run_git(root, ["fetch", "origin", config.base])
     remote = "FETCH_HEAD"
     result = run_git(root, ["merge-base", "--is-ancestor", "HEAD", remote], check=False)
     if result.returncode != 0:
         raise LifecycleError("Local base is ahead of or divergent from origin")
     run_git(root, ["merge", "--ff-only", remote])
-    run_git(root, ["switch", "-c", branch], check=True)
-    print(json_text({"repository": str(root), "branch": branch, "base": config.base}))
-    return 0
+    for _ in range(10):
+        branch = f"{config.feature_prefix}next-{uuid.uuid4().hex}"
+        run_git(root, ["check-ref-format", "--branch", branch])
+        existing = run_git(
+            root,
+            ["show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
+            check=False,
+        )
+        if existing.returncode == 0:
+            continue
+        if existing.returncode != 1:
+            raise LifecycleError("Unable to inspect generated working branch")
+        remote = run_git(
+            root, ["ls-remote", "--heads", "origin", f"refs/heads/{branch}"]
+        )
+        if remote.stdout.strip():
+            continue
+        run_git(root, ["switch", "-c", branch])
+        print(json_text({"repository": str(root), "branch": branch, "base": config.base}))
+        return 0
+    raise LifecycleError("Unable to allocate a unique working branch")
 
 
 def cmd_commit(args: argparse.Namespace) -> int:
@@ -540,7 +561,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     start = sub.add_parser("start")
     start.add_argument("--repo", default=".")
-    start.add_argument("--feature", required=True)
     start.set_defaults(handler=cmd_start)
 
     commit = sub.add_parser("commit")

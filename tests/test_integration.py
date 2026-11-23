@@ -140,7 +140,7 @@ class IntegrationTest(unittest.TestCase):
         self.args = [
             "--repo", str(self.repo), "--feature", "example", "--criteria-file", str(self.criteria)
         ]
-        self.assertEqual(main(["start", "--repo", str(self.repo), "--feature", "example"]), 0)
+        git(self.repo, "switch", "-c", "feature/example")
         (self.repo / "feature.txt").write_text("feature\n", encoding="utf-8")
         self.assertEqual(main([
             "commit", "--repo", str(self.repo), "--message", "Feature", "--path", "feature.txt"
