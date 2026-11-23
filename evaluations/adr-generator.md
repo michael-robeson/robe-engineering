@@ -1,15 +1,17 @@
 # Evaluation: ADR Generator
 
 - **Status:** adopted for personal use.
-- **Recommendation:** use the adapted candidate for personal ADR drafting,
+- **Recommendation:** use the adopted portable implementation for personal ADR drafting,
   while retaining repository instructions and explicit authorization for
   accepted status.
 - **Reviewed:** 2026-11-21.
 
 ## Provenance
 
-The local, untracked file is
-`~/Projects/robe-event-platform/.github/agents/adr-generator.agent.md`.
+The original local, untracked file was
+`~/Projects/robe-event-platform/.github/agents/adr-generator.agent.md`; it is
+preserved byte-for-byte at
+`~/Projects/robe-engineering/agents/sources/robe-event-platform/adr-generator.agent.md`.
 Its SHA-256 is
 `abbf07c6a768a21baa94a1aed858510c8038cb89866461d47ab64817e9f347ac`;
 its Git blob is `c67998f747edfee178183c983d860c3c1e336f80`.
@@ -25,6 +27,25 @@ The matching upstream revision includes the
 Its copyright and permission notice must accompany copies or substantial
 portions, including a future adaptation. Confirm any additional provenance
 or licensing requirements before redistribution.
+
+The previously committed Engineering version at
+`agents/adr-generator.agent.md` was last changed in commit
+`bc98c0ef7edc5af684d036b4ac4ba9cecb2c986c` and had Git blob
+`907bdedcf5c4abeeb01ec4076d3f47e52ad21822`. It is preserved byte-for-byte at
+`agents/sources/robe-engineering/adr-generator.agent.md` (SHA-256
+`27d232f4d6dc3e536814fdec1f7d980176de817b48633dc42e14f3edf3e1922b`).
+The adopted portable implementation is retained separately at
+`agents/adopted/portable-adr-generator.agent.md`; its current Git blob and
+SHA-256 match the Engineering original exactly.
+
+The archived Platform candidate is a distinct file: its Git blob is
+`c67998f747edfee178183c983d860c3c1e336f80`, rather than the Engineering
+version's `907bdedcf5c4abeeb01ec4076d3f47e52ad21822`. The Platform candidate
+matches the cited upstream revision; the adopted implementation also names
+that upstream revision in its attribution. The available records establish
+these content identities and differences, but do not establish whether either
+local version was derived from the other. All three files are retained, and
+no derivation direction is asserted.
 
 ## Read-only drafting-guidance test
 
@@ -63,17 +84,21 @@ or approval boundaries.
 
 ## Adapted candidate
 
-The unmodified agent cannot reliably respect varying ADR paths, numbering,
+The archived Platform agent cannot reliably respect varying ADR paths, numbering,
 templates, or accepted-decision boundaries: the written rules conflict with
 Robe's conventions.
 
-The [candidate](../agents/adr-generator.agent.md) adapts the matching
+The [adopted implementation](../agents/adopted/portable-adr-generator.agent.md) adapts the matching
 upstream revision for repository-convention discovery, approval boundaries,
-and evidence-grounded decision analysis. Its Git blob is
-`d2d278408ded1ac17c0b226031d4f8d57a727ceb`; this content identifier is not
-the upstream commit. The upstream copyright and MIT permission notice are
-preserved in [ADR-GENERATOR-LICENSE](../agents/ADR-GENERATOR-LICENSE).
-The original downloaded agent is unchanged. The candidate was subsequently
+and evidence-grounded decision analysis. At this stage of the evaluation its
+Git blob was `d2d278408ded1ac17c0b226031d4f8d57a727ceb`; this content
+identifier is not the upstream commit. The adopted source was later updated
+to blob `907bdedcf5c4abeeb01ec4076d3f47e52ad21822`, which matches the
+committed Engineering original. The available evidence does not establish a
+derivation relationship between the Engineering and Platform originals. The
+upstream copyright and MIT permission notice are preserved in
+[ADR-GENERATOR-LICENSE](../agents/adopted/ADR-GENERATOR-LICENSE). The archived
+Platform candidate is unchanged. The adopted implementation was subsequently
 installed for the controlled trial described below.
 
 ## Behavioral validation: 2026-11-21
@@ -251,9 +276,10 @@ the upstream attribution and adapted revision.
 
 ## Placement and next steps
 
-Adopt the candidate for personal use while keeping repository instructions,
+Adopt the implementation for personal use while keeping repository instructions,
 accepted decisions, and explicit authorization authoritative. The canonical
-adapted source is `~/Projects/robe-engineering/agents/adr-generator.agent.md`;
+adapted source is
+`~/Projects/robe-engineering/agents/adopted/portable-adr-generator.agent.md`;
 the upstream MIT attribution is preserved alongside it. Controlled personal
 installations are recorded at `~/.copilot/agents/portable-adr-generator.agent.md`
 and `~/.copilot/agents/ADR-GENERATOR-LICENSE`.

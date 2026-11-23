@@ -8,13 +8,37 @@ grant permissions, or replace their owning instructions.
 
 - [catalog.json](catalog.json): machine-readable inventory.
 - [evaluations/](evaluations/): focused reviews and outstanding decisions.
-- [agents/](agents/): source files for personal-agent candidates under evaluation.
+- [agents/sources/](agents/sources/): original and archived agent material, kept outside Copilot discovery paths.
+- [agents/adopted/](agents/adopted/): canonical sources for approved agent implementations.
+- [skills/sources/](skills/sources/): candidate skill sources with recorded provenance.
+- [skills/adopted/](skills/adopted/): canonical sources for approved reusable skills.
+- [docs/decisions/](docs/decisions/): shared engineering decisions.
+- [.github/copilot-instructions.md](.github/copilot-instructions.md): persistent repository instructions.
+- [prompts/](prompts/): reusable prompt templates.
 
-The initial inventory was captured from the local machine on 2026-11-21.
-Paths beginning `~/` are observed locations on that machine, not promises
-that a capability is installed or loaded elsewhere. Repository revision
-values refer to the last commit observed for that file; provider-managed
-cache names are not upstream versions. `null` means unknown or not verified.
+The inventory was first captured from the local machine on 2026-11-21 and
+reorganized on 2026-11-23. Paths beginning `~/` are observed locations on
+that machine, not promises that a capability is installed or loaded
+elsewhere. Repository revision values refer to the last commit observed for
+that file; provider-managed cache names are not upstream versions. `null`
+means unknown or not verified.
+
+`catalog.json` is the authoritative inventory for agents and skills. It
+records evaluation status, provenance, source revision or its unknown state,
+and current and original locations. Evaluation documents provide supporting
+evidence. Candidate files under `agents/sources/` are not approved or
+activated; only deliberately installed approved implementations are used.
+Repository-scoped skills remain in their owning repositories and are
+referenced here rather than copied.
+
+The ADR Generator's committed Engineering original and archived Platform
+candidate are kept separately under `agents/sources/`; the adopted portable
+implementation remains under `agents/adopted/`. The catalog and evaluation
+record their verified content relationships without asserting a derivation
+between the two originals. Currently, the skill and prompt directories
+contain guidance README files only; no shared skills or prompt templates are
+inventoried there. The decisions directory contains the lifecycle integration
+decision record.
 
 ## Lifecycle
 
