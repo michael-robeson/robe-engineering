@@ -88,15 +88,16 @@ The archived Platform agent cannot reliably respect varying ADR paths, numbering
 templates, or accepted-decision boundaries: the written rules conflict with
 Robe's conventions.
 
-The [adopted implementation](../agents/adopted/portable-adr-generator.agent.md) adapts the matching
-upstream revision for repository-convention discovery, approval boundaries,
-and evidence-grounded decision analysis. At this stage of the evaluation its
+The [adopted implementation](../agents/adopted/portable-adr-generator.agent.md)
+provides repository-convention discovery, approval boundaries, and
+evidence-grounded decision analysis. At this stage of the evaluation its
 Git blob was `d2d278408ded1ac17c0b226031d4f8d57a727ceb`; this content
-identifier is not the upstream commit. The adopted source was later updated
-to blob `907bdedcf5c4abeeb01ec4076d3f47e52ad21822`, which matches the
-committed Engineering original. The available evidence does not establish a
-derivation relationship between the Engineering and Platform originals. The
-upstream copyright and MIT permission notice are preserved in
+identifier is not the upstream commit. Its header attributes it to the cited
+upstream revision. The adopted source was later updated to blob
+`907bdedcf5c4abeeb01ec4076d3f47e52ad21822`, which matches the committed
+Engineering original. The available evidence does not establish a derivation
+relationship between the Engineering and Platform originals. The upstream
+copyright and MIT permission notice are preserved in
 [ADR-GENERATOR-LICENSE](../agents/adopted/ADR-GENERATOR-LICENSE). The archived
 Platform candidate is unchanged. The adopted implementation was subsequently
 installed for the controlled trial described below.
