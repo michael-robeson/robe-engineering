@@ -19,6 +19,16 @@ base must be an ancestor of the approved candidate; a changed base requires a
 new candidate and approval rather than silently integrating an unreviewed
 combination.
 
+Routine feature development uses the existing working checkout; the
+implementation does not create linked Git worktrees. Startup reuses a clean,
+generated, local-only feature branch if one is already checked out. When a
+branch is needed, startup requires the clean configured base, synchronizes it
+with a fast-forward from `origin`, and generates a collision-resistant
+local-only name automatically. It does not request a feature scope or branch
+name. Dirty work, an unrelated checked-out branch, or unsafe base
+synchronization is preserved and reported as a blocker rather than prompting
+the developer to switch directories or creating an alternative worktree.
+
 Following a verified merge and safe local synchronization, cleanup removes
 only the reviewed branch. Remote deletion uses an expected-SHA lease so a
 branch that advanced after verification is not deleted. Local deletion uses
@@ -59,6 +69,9 @@ repository-configured feature prefix), so users do not need to supply a scope
 or branch name for this disposable branch. The UUID provides collision
 resistance; the CLI also checks local and remote refs and never overwrites an
 existing branch or pushes the new one.
+
+The standard startup command reuses this branch while it remains clean and
+local-only. Neither startup nor integration creates a linked worktree.
 
 The CLI records the generated name and synchronized base commit in Git
 metadata before creating the branch. `resume` reuses that record after an

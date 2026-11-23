@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from eng_lifecycle.cli import main
@@ -33,6 +34,7 @@ class LifecycleTest(unittest.TestCase):
         self.base = Path(self.temp.name)
         self.repo = self.base / "repo"
         self.bare = self.base / "origin.git"
+        self.feature = ""
         self.repo.mkdir()
         run("git", "init", "-b", "develop", cwd=self.repo)
         run("git", "config", "user.name", "Lifecycle Test", cwd=self.repo)
@@ -67,8 +69,13 @@ class LifecycleTest(unittest.TestCase):
             json.dumps(config, sort_keys=True, indent=2), encoding="utf-8"
         )
 
-    def start(self, name: str = "increment-one") -> int:
-        return main(["start", "--repo", str(self.repo), "--feature", name])
+    def start(self) -> int:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            result = main(["start", "--repo", str(self.repo)])
+        if result == 0:
+            self.feature = json.loads(output.getvalue())["branch"]
+        return result
 
     def commit(self, message: str = "Add feature") -> int:
         path = self.repo / "feature.txt"
@@ -94,7 +101,7 @@ class LifecycleTest(unittest.TestCase):
                 "--repo",
                 str(self.repo),
                 "--feature",
-                "increment-one",
+                self.feature,
                 "--criteria-file",
                 str(path),
             ]
@@ -108,7 +115,7 @@ class LifecycleTest(unittest.TestCase):
                 "--repo",
                 str(self.repo),
                 "--feature",
-                "increment-one",
+                self.feature,
                 "--criteria-file",
                 str(criteria),
                 "--message",
@@ -128,7 +135,7 @@ class LifecycleTest(unittest.TestCase):
                 "--repo",
                 str(self.repo),
                 "--feature",
-                "increment-one",
+                self.feature,
                 "--criteria-file",
                 str(criteria),
             ]
@@ -179,7 +186,7 @@ class LifecycleTest(unittest.TestCase):
                     "--repo",
                     str(self.repo),
                     "--feature",
-                    "increment-one",
+                    self.feature,
                     "--criteria-file",
                     str(criteria),
                 ]
@@ -200,7 +207,7 @@ class LifecycleTest(unittest.TestCase):
                     "--repo",
                     str(self.repo),
                     "--feature",
-                    "increment-one",
+                    self.feature,
                     "--criteria-file",
                     str(criteria),
                 ]
@@ -221,7 +228,7 @@ class LifecycleTest(unittest.TestCase):
                     "--repo",
                     str(self.repo),
                     "--feature",
-                    "increment-one",
+                    self.feature,
                     "--criteria-file",
                     str(criteria),
                 ]
@@ -244,7 +251,7 @@ class LifecycleTest(unittest.TestCase):
                     "--repo",
                     str(self.repo),
                     "--feature",
-                    "increment-one",
+                    self.feature,
                     "--criteria-file",
                     str(criteria),
                 ]
@@ -290,7 +297,7 @@ class LifecycleTest(unittest.TestCase):
         output = io.StringIO()
         with redirect_stdout(output):
             result = main([
-                "status", "--repo", str(self.repo), "--feature", "increment-one",
+                "status", "--repo", str(self.repo), "--feature", self.feature,
                 "--criteria-file", str(criteria),
             ])
         self.assertEqual(result, 1)
@@ -333,7 +340,7 @@ class LifecycleTest(unittest.TestCase):
         output = io.StringIO()
         with redirect_stdout(output):
             result = main([
-                "status", "--repo", str(self.repo), "--feature", "increment-one",
+                "status", "--repo", str(self.repo), "--feature", self.feature,
                 "--criteria-file", str(criteria),
             ])
         self.assertEqual(result, 1)
@@ -353,7 +360,7 @@ class LifecycleTest(unittest.TestCase):
                 "--repo",
                 str(self.repo),
                 "--feature",
-                "increment-one",
+                self.feature,
                 "--criteria-file",
                 str(criteria),
             ]
@@ -447,7 +454,7 @@ class LifecycleTest(unittest.TestCase):
         for commands in ([], [""], ["'"], [123], [{"argv": ["true"], "authorization": "unknown"}]):
             config["readiness_gate"]["commands"] = commands
             path.write_text(json.dumps(config), encoding="utf-8")
-            self.assertEqual(main(["review", "--repo", str(self.repo), "--feature", "increment-one", "--criteria", "check"]), 2)
+            self.assertEqual(main(["review", "--repo", str(self.repo), "--feature", self.feature, "--criteria", "check"]), 2)
 
     def test_authorized_check_is_not_run_without_authorization(self) -> None:
         self.assertEqual(self.start(), 0)
@@ -461,10 +468,10 @@ class LifecycleTest(unittest.TestCase):
         path.write_text(json.dumps(config), encoding="utf-8")
         run("git", "add", ".github/lifecycle.json", cwd=self.repo)
         run("git", "commit", "-m", "Configure authorized check", cwd=self.repo)
-        args = ["review", "--repo", str(self.repo), "--feature", "increment-one", "--criteria", "check"]
+        args = ["review", "--repo", str(self.repo), "--feature", self.feature, "--criteria", "check"]
         self.assertEqual(main(args), 1)
         self.assertFalse(marker.exists())
-        self.assertEqual(main(["approve", "--repo", str(self.repo), "--feature", "increment-one", "--criteria", "check", "--message", "APPROVED"]), 2)
+        self.assertEqual(main(["approve", "--repo", str(self.repo), "--feature", self.feature, "--criteria", "check", "--message", "APPROVED"]), 2)
         self.assertEqual(main([*args, "--authorize", "database"]), 0)
         self.assertTrue(marker.exists())
 
@@ -478,7 +485,7 @@ class LifecycleTest(unittest.TestCase):
             with self.assertRaises(KeyboardInterrupt):
                 self.review()
         self.assertEqual(self.approve(criteria), 2)
-        self.assertEqual(main(["status", "--repo", str(self.repo), "--feature", "increment-one", "--criteria-file", str(criteria)]), 1)
+        self.assertEqual(main(["status", "--repo", str(self.repo), "--feature", self.feature, "--criteria-file", str(criteria)]), 1)
 
     def test_tampered_review_or_evidence_cannot_be_approved(self) -> None:
         self.assertEqual(self.start(), 0)
@@ -504,7 +511,7 @@ class LifecycleTest(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertEqual(self.approve(criteria), 0)
         self.assertEqual(self.review()[0], 0)
-        self.assertEqual(main(["status", "--repo", str(self.repo), "--feature", "increment-one", "--criteria-file", str(criteria)]), 0)
+        self.assertEqual(main(["status", "--repo", str(self.repo), "--feature", self.feature, "--criteria-file", str(criteria)]), 0)
 
     def test_readiness_check_mutating_worktree_fails(self) -> None:
         self.assertEqual(self.start(), 0)
@@ -523,6 +530,77 @@ class LifecycleTest(unittest.TestCase):
         self.assertEqual(run("git", "rev-parse", "HEAD", cwd=self.repo).stdout, before)
         (self.repo / "dirty").write_text("dirty", encoding="utf-8")
         self.assertEqual(self.start(), 2)
+
+    def test_start_generates_and_reuses_clean_disposable_branch(self) -> None:
+        self.assertEqual(self.start(), 0)
+        branch = self.feature
+        self.assertRegex(branch, r"^feature/next-[0-9a-f]{32}$")
+        self.assertEqual(run("git", "branch", "--show-current", cwd=self.repo).stdout.strip(), branch)
+        self.assertEqual(
+            run("git", "ls-remote", "--heads", "origin", f"refs/heads/{branch}", cwd=self.repo).stdout,
+            "",
+        )
+        self.assertEqual(self.commit(), 0)
+        committed = run("git", "rev-parse", "HEAD", cwd=self.repo).stdout
+        self.assertEqual(self.start(), 0)
+        self.assertEqual(self.feature, branch)
+        self.assertEqual(run("git", "rev-parse", "HEAD", cwd=self.repo).stdout, committed)
+        self.assertEqual(
+            run("git", "branch", "--list", "feature/next-*", cwd=self.repo).stdout.splitlines(),
+            [f"* {branch}"],
+        )
+
+    def test_start_retries_local_and_remote_branch_collisions(self) -> None:
+        local_id = "a" * 32
+        remote_id = "b" * 32
+        selected_id = "c" * 32
+        local_branch = f"feature/next-{local_id}"
+        remote_branch = f"feature/next-{remote_id}"
+        run("git", "branch", local_branch, cwd=self.repo)
+        local_tip = run("git", "rev-parse", local_branch, cwd=self.repo).stdout
+        run("git", "push", "origin", f"develop:refs/heads/{remote_branch}", cwd=self.repo)
+        remote_tip = run(
+            "git", "ls-remote", "--heads", "origin", f"refs/heads/{remote_branch}", cwd=self.repo
+        ).stdout
+        generated = iter((local_id, remote_id, selected_id))
+        with patch(
+            "eng_lifecycle.cli.uuid.uuid4",
+            side_effect=lambda: SimpleNamespace(hex=next(generated)),
+        ):
+            self.assertEqual(self.start(), 0)
+        self.assertEqual(self.feature, f"feature/next-{selected_id}")
+        self.assertEqual(run("git", "rev-parse", local_branch, cwd=self.repo).stdout, local_tip)
+        self.assertEqual(
+            run("git", "ls-remote", "--heads", "origin", f"refs/heads/{remote_branch}", cwd=self.repo).stdout,
+            remote_tip,
+        )
+        self.assertEqual(
+            run(
+                "git", "ls-remote", "--heads", "origin",
+                f"refs/heads/{self.feature}", cwd=self.repo
+            ).stdout,
+            "",
+        )
+
+    def test_start_preserves_dirty_generated_branch_and_rejects_other_branches(self) -> None:
+        self.assertEqual(self.start(), 0)
+        generated_branch = self.feature
+        (self.repo / "uncommitted.txt").write_text("preserve\n", encoding="utf-8")
+        self.assertEqual(self.start(), 2)
+        self.assertEqual(
+            run("git", "branch", "--show-current", cwd=self.repo).stdout.strip(),
+            generated_branch,
+        )
+        self.assertTrue((self.repo / "uncommitted.txt").exists())
+        (self.repo / "uncommitted.txt").unlink()
+
+        run("git", "switch", "develop", cwd=self.repo)
+        run("git", "switch", "-c", "feature/unrelated", cwd=self.repo)
+        self.assertEqual(self.start(), 2)
+        self.assertEqual(
+            run("git", "branch", "--show-current", cwd=self.repo).stdout.strip(),
+            "feature/unrelated",
+        )
 
     def test_start_fast_forwards_remote_ahead(self) -> None:
         other = self.base / "other"
@@ -577,7 +655,7 @@ class LifecycleTest(unittest.TestCase):
         record = json.loads(approval.read_text(encoding="utf-8"))
         record["approved_at"] = ""
         approval.write_text(json.dumps(record), encoding="utf-8")
-        self.assertEqual(main(["status", "--repo", str(self.repo), "--feature", "increment-one", "--criteria-file", str(criteria)]), 1)
+        self.assertEqual(main(["status", "--repo", str(self.repo), "--feature", self.feature, "--criteria-file", str(criteria)]), 1)
 
     def test_verification_entrypoint_propagates_unit_test_failure(self) -> None:
         fixture = self.base / "verification"

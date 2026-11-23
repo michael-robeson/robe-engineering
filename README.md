@@ -119,14 +119,13 @@ lifecycle readiness gate invokes it; verification alone does not record
 approval or authorize integration.
 
 ```sh
-eng-lifecycle start --repo . --feature shared-lifecycle-cli
+eng-lifecycle start --repo .
 eng-lifecycle commit --repo . --message "Implement increment" --path src
-eng-lifecycle review --repo . --feature shared-lifecycle-cli --criteria-file acceptance.txt
-eng-lifecycle approve --repo . --feature shared-lifecycle-cli --criteria-file acceptance.txt --message APPROVED
-eng-lifecycle status --repo . --feature shared-lifecycle-cli --criteria-file acceptance.txt
-eng-lifecycle integrate --repo . --feature shared-lifecycle-cli --criteria-file acceptance.txt
-eng-lifecycle resume --repo . --feature shared-lifecycle-cli --criteria-file acceptance.txt
 ```
+
+`start` prints the generated or reused branch. For later `review`, `approve`,
+`status`, `integrate`, and `resume` commands, pass that reported branch to
+`--feature`; no feature scope or branch name is chosen at startup.
 
 Install the repository pre-commit hook separately:
 
@@ -136,10 +135,16 @@ sh scripts/install-hooks.sh
 
 The CLI stores only review evidence and approval metadata under Git's
 actual git directory. It derives branch, commit, worktree, review, and
-candidate state from Git. Start requires a clean checkout of the configured
-base and refuses local-ahead or divergent history. Scoped commits refuse an
-already populated index; installed Git hooks run normally. The supplied hook
-checks staged Python blobs, not unstaged working-tree contents.
+candidate state from Git. Routine development uses the existing checkout;
+the CLI does not create linked worktrees. `start` reuses a clean generated
+local-only branch when one is already checked out. Otherwise, it requires a
+clean checkout of the configured base, fast-forwards it from `origin`, and
+creates a collision-resistant local-only branch automatically. A dirty
+checkout, unrelated branch, or local-ahead/divergent base blocks startup
+without stashing or switching to another directory or worktree. Scoped
+commits refuse an already populated index; installed Git hooks run normally.
+The supplied hook checks staged Python blobs, not unstaged working-tree
+contents.
 
 The repository's `.github/lifecycle.json` defines commands as shell-like
 strings or argument arrays, executed directly without a shell. Readiness
@@ -173,7 +178,8 @@ creates a collision-resistant, local-only branch using the configured feature
 prefix and a UUID4 identifier, from the synchronized base, and reports its
 name; no scope or branch name is requested. `resume` reconstructs state from
 Git and GitHub after interruption and reuses the same generated branch; it
-uses the same approval and criteria. No new source commit is created after
+uses the same approval and criteria. The next `start` reuses this branch when
+it is still clean and local-only. No new source commit is created after
 approval.
 
 Each target repository must configure a nonempty `required_ci` array and an
