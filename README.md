@@ -35,10 +35,12 @@ The ADR Generator's committed Engineering original and archived Platform
 candidate are kept separately under `agents/sources/`; the adopted portable
 implementation remains under `agents/adopted/`. The catalog and evaluation
 record their verified content relationships without asserting a derivation
-between the two originals. Currently, the skill and prompt directories
-contain guidance README files only; no shared skills or prompt templates are
-inventoried there. The decisions directory contains the lifecycle integration
-decision record.
+between the two originals. The adopted
+[Specification Authoring skill](skills/adopted/specification-authoring/SKILL.md)
+and optional template provide reusable documentation guidance; the skill's
+provenance and evaluation are recorded in
+[evaluations/specification-authoring.md](evaluations/specification-authoring.md).
+The decisions directory contains the lifecycle integration decision record.
 
 ## Lifecycle
 
