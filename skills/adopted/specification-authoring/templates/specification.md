@@ -1,55 +1,59 @@
-# [Specification title]
+# [Capability or outcome]
 
-Use only the sections that help explain the capability and verify its
-outcomes. Delete unused sections and instructional text. Follow the owning
-repository's documentation conventions; this template does not define a
-required location, naming scheme, status vocabulary, or approval process.
+This outline is optional. Keep the parts that help explain the intended
+outcome and remove the rest. Use the owning repository's established document
+location, naming, and metadata conventions.
 
-## Purpose and scope
+## Purpose and ownership
 
-Describe the outcome and intended readers. State what is in scope and, where
-useful, what is explicitly out of scope.
+What outcome is being described? Which capability owner is responsible?
 
-## Context and authoritative references
+## Boundaries
 
-Link to relevant repository instructions, architecture guidance, ADRs,
-contracts, schemas, and related documentation. Summarize only context needed
-to understand this specification; preserve the linked source as authoritative.
+What does this document cover? What is deliberately excluded?
 
-## Requirements, constraints, and recommendations
+## Context and authoritative sources
 
-Separate required behavior from established constraints and non-binding
-recommendations. Add identifiers when they provide meaningful traceability.
+Link to relevant repository instructions, accepted decisions, contracts,
+schemas, and related documents. Note only context needed to interpret this
+specification.
 
-- **[Optional ID] Requirement:** [Observable behavior or outcome.]
-- **[Optional ID] Constraint:** [Established boundary or decision.]
-- **[Optional ID] Recommendation:** [Non-mandatory guidance.]
+## Expected behavior
 
-## Interfaces and data contracts
+List behavior that must hold. Add identifiers when they help trace work across
+requirements, interfaces, and validation.
 
-Describe only relevant boundaries, ownership, data meaning, compatibility,
-failure behavior, and security or operational obligations. Reference the
-authoritative contract or schema when one exists.
+## Established constraints
 
-## Acceptance criteria
+List fixed boundaries or accepted decisions that affect this outcome. Link to
+the decision or contract that establishes each constraint.
 
-State observable checks for the requirements. Link criteria to requirement
-identifiers only when identifiers are useful.
+## Recommendations
 
-- [Optional: Given / When / Then or another repository-standard testable form.]
+Include non-binding guidance only when it helps readers make consistent
+choices.
 
-## Dependencies and assumptions
+## Interfaces and data boundaries
 
-Record only dependencies or assumptions that affect scope, behavior, or
-verification. Mark unresolved items explicitly.
+Describe relevant interactions, ownership, data meaning, compatibility, and
+failure behavior, or link to their authoritative definitions.
+
+## Acceptance evidence
+
+State observable checks for the expected behavior. Use the repository's
+established testing language and conventions.
+
+## Dependencies and unresolved points
+
+Record only dependencies, assumptions, or open questions that affect scope,
+behavior, or validation. Make unresolved decisions explicit.
 
 ## Examples and edge cases
 
-Include examples or edge cases only when they clarify expected behavior.
+Add examples or exceptional cases when they clarify expected behavior.
 
-## Validation and related documentation
+## Related documentation and maintenance
 
-Describe relevant validation using the owning repository's established
-testing and documentation conventions. Link related material rather than
-duplicating it.
+Link to related material and identify what change would make this document
+stale, if that is useful.
 

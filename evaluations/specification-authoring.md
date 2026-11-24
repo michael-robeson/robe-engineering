@@ -1,49 +1,81 @@
 # Evaluation: Specification Authoring
 
-- **Status:** adopted as a canonical shared skill in `robe-engineering`.
-- **Reviewed:** 2026-11-23.
-- **Scope:** Reusable authoring guidance; specifications remain owned by the
-  repository that owns the capability.
+- **Status:** adopted as a canonical Engineering skill, independently
+  authored from approved requirements.
+- **Reviewed:** 2026-11-24.
+- **Scope:** Cross-repository authoring guidance; each specification remains
+  owned by the repository responsible for its capability.
 
-## Provenance and license
+## Provenance and rights
 
-The source is the archived downloaded
-[Specification agent](../agents/sources/robe-event-platform/specification.agent.md),
+The archived candidate is
+[Specification.agent.md](../agents/sources/robe-event-platform/specification.agent.md),
 originally observed at
 `robe-event-platform/.github/agents/specification.agent.md`. Its SHA-256 is
-`4f3dd21f43b8ab3bb62e36f8ff3a5d3484bc88fc8ad9698fcad1060a4cb6dbdc`, verified
-against the preserved source file. The actual download source, upstream
-revision, and license are unknown; no license is asserted for the source or
-the derived skill. The archived candidate remains unchanged. The adopted
-methodology and template are a tailored rewrite rather than a copy of the
-agent's template.
+`4f3dd21f43b8ab3bb62e36f8ff3a5d3484bc88fc8ad9698fcad1060a4cb6dbdc`.
+Neither the archived file nor the catalog identifies an upstream URL,
+revision, copyright notice, or license. Reuse rights therefore could not be
+established.
 
-## Assessment and adaptation
+The previous adopted text, skill blob
+`4cdccfea04203ea2ce2000cdad8fa08a71f45387`, has been replaced. The current
+skill and template were independently written from the requirements approved
+for this work: clear expected behavior; distinct requirements, constraints,
+and recommendations; explicit scope; relevant interfaces and data boundaries;
+verifiable acceptance checks; and conditional use of identifiers,
+dependencies, examples, and edge cases. They also apply the approved
+Engineering principles of proportional documentation, authoritative
+references, repository-owned conventions, and no blanket specification
+requirement. The archived candidate remains preserved for provenance only;
+its text is not the source of the current content, and no license is asserted.
 
-The source usefully emphasizes clear requirements, explicit constraints,
-interfaces, testable acceptance criteria, traceability, dependencies, and
-relevant examples or edge cases. Its fixed directory and naming convention,
-required section list, prescriptive test strategy, and demand for
-self-contained documents conflict with repository-owned documentation
-conventions and the need to reference authoritative ADRs, contracts, and
-schemas.
+## Design assessment
 
-The adopted skill retains the useful concepts while making scope and detail
-proportionate. Its companion template is optional by section; requirements,
-constraints, recommendations, interfaces, criteria, examples, and identifiers
-are used only where they add value. Testing follows the owning repository's
-conventions. The skill does not prescribe implementation absent an established
-constraint, mandate a specification for each increment, or establish
-specification governance.
+The skill is optional and is activated by a specification request or when an
+existing specification is part of the task. Its template is an outline rather
+than a required form. The guidance directs authors to follow the capability
+owner's repository, refer to accepted ADRs/contracts/schemas, and inherit its
+testing and documentation conventions instead of prescribing a fixed format
+or implementation.
 
-## Discovery and consumption evidence
+For Platform capabilities, the skill places specification ownership in
+`robe-event-platform` and points authors to ADR-0005's implement/accommodate/
+defer reasoning without turning deferred concerns into implementation
+requirements.
 
-The canonical source is under `skills/adopted/`, outside the Platform
-repository's `.github/skills/` discovery path. Platform architecture
-documentation assigns shared skill ownership to `robe-engineering`, but the
-repositories do not establish a cross-repository distribution mechanism.
-Therefore this evaluation does not claim that the skill is discoverable or
-invokable from a Platform workspace. Consumer wiring and its discovery test
-remain pending an approved distribution decision; no copy or new mechanism
-has been introduced.
+## Discovery experiment
+
+The target `~/.copilot/skills/specification-authoring` did not exist before
+the test. A symbolic link was created from that location to the canonical
+`~/Projects/robe-engineering/skills/adopted/specification-authoring`
+directory. The link resolved to the Engineering checkout, and both
+`SKILL.md` and `templates/specification.md` were readable through it. This
+adds no copied or separately maintained content.
+
+In fresh Copilot chat `e063bc5b-eeb5-4511-a0b6-c443f5322227`, the submitted
+`/specification-authoring` prompt produced an actual `skill` invocation for
+`specification-authoring` in the session tool log. The session then read
+`~/.copilot/skills/specification-authoring/templates/specification.md`
+through the symlink and returned its headings. It produced a brief,
+unsaved hypothetical outline, assigned Platform capability documentation to
+`robe-event-platform`, and used ADR-0005 to distinguish current requirements
+from accommodate/defer topics. Its tool log shows no file writes; the
+Workbench was not touched.
+
+The session metadata identified `robe-engineering` as the primary project,
+with `robe-event-platform` among its working directories. Therefore this is
+verified Copilot discovery, invocation, and template access in a multi-root
+session with Platform available, but not in an isolated Platform-only
+workspace. The tool-mediated invocation and file access required no manual
+VS Code interaction. The visible slash-menu listing and single-root Platform
+workspace behavior were not inspected; confirming those specific UI states
+requires opening a Platform-only VS Code chat and checking its `/` menu or
+Chat: Open Customizations.
+
+The tested personal path is supported by
+[VS Code's Agent Skills documentation](https://code.visualstudio.com/docs/agent-customization/agent-skills),
+which lists `~/.copilot/skills/` as a personal skill location. This experiment
+verifies only this machine's link and session. The absolute symlink depends on
+the Engineering checkout remaining at its current path; it is not a
+cross-machine distribution mechanism.
 
