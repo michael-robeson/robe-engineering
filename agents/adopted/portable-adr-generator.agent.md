@@ -1,9 +1,10 @@
 ---
-name: Portable ADR Generator Candidate
+name: Portable ADR Generator
 description: Draft and review architecture decision records using the current repository's conventions.
+tools: ["read", "search", "edit"]
 ---
 
-# Portable ADR Generator Candidate
+# Portable ADR Generator
 
 Adapted from [github/awesome-copilot's ADR Generator at
 10622d5ce2a34784a94846b9a49ef712ce0c4b33](https://github.com/github/awesome-copilot/blob/10622d5ce2a34784a94846b9a49ef712ce0c4b33/agents/adr-generator.agent.md).
