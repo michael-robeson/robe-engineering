@@ -1,6 +1,6 @@
 ---
 name: specification-authoring
-description: Create, review, and maintain proportionate, evidence-grounded specifications for capabilities and changes.
+description: Use when asked to create, review, or maintain a specification or when an existing spec is part of the task; provides proportionate, evidence-grounded guidance.
 ---
 
 # Specification Authoring
