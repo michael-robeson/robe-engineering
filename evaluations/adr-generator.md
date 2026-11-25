@@ -25,8 +25,14 @@ No local modifications relative to that blob were observed.
 The matching upstream revision includes the
 [MIT license](https://github.com/github/awesome-copilot/blob/10622d5ce2a34784a94846b9a49ef712ce0c4b33/LICENSE).
 Its copyright and permission notice must accompany copies or substantial
-portions, including a future adaptation. Confirm any additional provenance
-or licensing requirements before redistribution.
+portions, including a future adaptation. The notice is now preserved beside
+the archived Platform copy in
+[agents/sources/robe-event-platform/LICENSE](../agents/sources/robe-event-platform/LICENSE)
+and remains beside the adopted implementation in
+[agents/adopted/ADR-GENERATOR-LICENSE](../agents/adopted/ADR-GENERATOR-LICENSE).
+The archive's source path and pinned blob are recorded in
+[the source index](../agents/sources/README.md). The actual download route is
+unknown; no individual author is identified by the copied file.
 
 The previously committed Engineering version at
 `agents/adr-generator.agent.md` was last changed in commit
@@ -37,6 +43,9 @@ The previously committed Engineering version at
 The adopted portable implementation is retained separately at
 `agents/adopted/portable-adr-generator.agent.md`; its current Git blob and
 SHA-256 match the Engineering original exactly.
+The Engineering archive copy is accompanied by the upstream MIT notice in
+`agents/sources/robe-engineering/LICENSE`, and its attribution and unresolved
+derivation details are recorded in the source index.
 
 The archived Platform candidate is a distinct file: its Git blob is
 `c67998f747edfee178183c983d860c3c1e336f80`, rather than the Engineering
