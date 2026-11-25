@@ -53,7 +53,7 @@ capability needs; it is not a prerequisite for each implementation change.
 
 ## Platform capabilities
 
-For a capability owned by `robe-event-platform`, its specification belongs
+For a capability owned by `robe-platform-event`, its specification belongs
 to that repository and follows its documentation conventions. Consult
 ADR-0005, Evolutionary Architecture and Incremental Delivery, to separate
 current acceptance needs from future concerns. Recording a future concern

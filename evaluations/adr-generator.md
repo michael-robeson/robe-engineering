@@ -59,7 +59,7 @@ no derivation direction is asserted.
 ## Read-only drafting-guidance test
 
 Test input: the accepted
-[ADR-0003: Persistence Independence](https://github.com/michael-robeson/robe-event-platform/blob/6ee32803c30335516782a35d3e313ea47eaecdda/docs/decisions/0003-persistence-independence.md),
+[ADR-0003: Persistence Independence](https://github.com/robe-land/robe-platform-event/blob/6ee32803c30335516782a35d3e313ea47eaecdda/docs/decisions/0003-persistence-independence.md),
 the repository's ADR template and conventions, and the current set of ADR
 files. This is a manual, read-only dry run of the agent's written steps,
 not an invocation of the agent or evidence of its runtime compliance.

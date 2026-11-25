@@ -49,7 +49,7 @@ testing and documentation conventions instead of prescribing a fixed format
 or implementation.
 
 For Platform capabilities, the skill places specification ownership in
-`robe-event-platform` and points authors to ADR-0005's implement/accommodate/
+`robe-platform-event` and points authors to ADR-0005's implement/accommodate/
 defer reasoning without turning deferred concerns into implementation
 requirements.
 
@@ -61,6 +61,15 @@ the test. A symbolic link was created from that location to the canonical
 directory. The link resolved to the Engineering checkout, and both
 `SKILL.md` and `templates/specification.md` were readable through it. This
 adds no copied or separately maintained content.
+
+## Current installation inventory
+
+The current `~/.copilot/skills/specification-authoring` path is a copied
+installation pinned to the published `specification-authoring-v1.0.0` tag in
+`robe-land/.github`. Its `SKILL.md` records the pinned reference and tree
+revision. The path is a directory, not a symbolic link. The symlink
+experiment above is retained as historical evidence and does not describe
+the current installation.
 
 In fresh Copilot chat `e063bc5b-eeb5-4511-a0b6-c443f5322227`, the submitted
 `/specification-authoring` prompt produced an actual `skill` invocation for
