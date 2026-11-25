@@ -13,9 +13,17 @@ The archived candidate is
 originally observed at
 `robe-event-platform/.github/agents/specification.agent.md`. Its SHA-256 is
 `4f3dd21f43b8ab3bb62e36f8ff3a5d3484bc88fc8ad9698fcad1060a4cb6dbdc`.
-Neither the archived file nor the catalog identifies an upstream URL,
-revision, copyright notice, or license. Reuse rights therefore could not be
-established.
+Its Git blob exactly matches
+[`github/awesome-copilot/agents/specification.agent.md` at commit
+`93fc8b9ee3ef56b9b5e7261e6ce92d314cb2c1cf`](https://github.com/github/awesome-copilot/blob/93fc8b9ee3ef56b9b5e7261e6ce92d314cb2c1cf/agents/specification.agent.md).
+The upstream repository's MIT notice at that revision is preserved alongside
+the archive in
+[agents/sources/robe-event-platform/LICENSE](../agents/sources/robe-event-platform/LICENSE);
+the per-file blob match and attribution are recorded in
+[the source index](../agents/sources/README.md). This establishes an MIT
+licensed source match for the archived bytes, but does not establish the
+original download route or acquisition date. The upstream notice names
+GitHub, Inc.; the file does not identify individual authors.
 
 The previous adopted text, skill blob
 `4cdccfea04203ea2ce2000cdad8fa08a71f45387`, has been replaced. The current
@@ -27,7 +35,9 @@ dependencies, examples, and edge cases. They also apply the approved
 Engineering principles of proportional documentation, authoritative
 references, repository-owned conventions, and no blanket specification
 requirement. The archived candidate remains preserved for provenance only;
-its text is not the source of the current content, and no license is asserted.
+its text is not the source of the current content. The candidate remains
+discovered, not adopted, and this rights finding does not authorize its
+publication as an Engineering resource.
 
 ## Design assessment
 
