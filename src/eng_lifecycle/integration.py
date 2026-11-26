@@ -18,6 +18,7 @@ from .cli import (
     read_criteria,
     storage,
     validate_approval_record,
+    validate_architecture_review,
     validate_evidence,
 )
 from .config import LifecycleConfig, LifecycleError, load_config
@@ -134,12 +135,19 @@ def approved_candidate(
         "candidate_commit": candidate,
         "candidate_tree": tree,
         "acceptance_criteria_sha256": criteria_hash,
+        "acceptance_criteria": criteria,
         "quality_policy_sha256": sha256_bytes(config.policy_bytes()),
     }
     for key, value in expected.items():
         if record.get(key) != value:
             raise LifecycleError(f"Approval does not match current {key}")
-    validate_evidence(config, directory, {**expected, "acceptance_criteria": criteria})
+    validate_evidence(config, directory, expected)
+    validate_architecture_review(directory, expected)
+    architecture_review_hash = sha256_bytes(
+        (directory / "architecture-review.json").read_bytes()
+    )
+    if record.get("architectural_review_sha256") != architecture_review_hash:
+        raise LifecycleError("Approval does not match current architectural review")
     actual_tree = run_git(root, ["rev-parse", "--verify", f"{candidate}^{{tree}}"]).stdout.strip()
     if actual_tree != tree:
         raise LifecycleError("Approved commit does not match approved tree")

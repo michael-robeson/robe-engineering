@@ -111,6 +111,34 @@ def cmd_start(args: argparse.Namespace) -> int:
     raise LifecycleError("Unable to allocate a unique working branch")
 
 
+def cmd_continue(args: argparse.Namespace) -> int:
+    root = repository_root(Path(args.repo))
+    config = load_config(root)
+    ensure_no_git_operation(root)
+    branch = current_branch(root)
+    feature = branch_name(args.feature, config.feature_prefix)
+    if branch != feature:
+        raise LifecycleError("Feature identifier does not match the current branch")
+    if not branch.startswith(config.feature_prefix):
+        raise LifecycleError(
+            f"Continue requires a {config.feature_prefix} feature branch"
+        )
+    changes = dirty_porcelain(root).splitlines()
+    print(
+        json_text(
+            {
+                "repository": str(root),
+                "branch": branch,
+                "base": config.base,
+                "worktree_clean": not changes,
+                "changes": changes,
+                "ownership_verified": False,
+            }
+        )
+    )
+    return 0
+
+
 def cmd_commit(args: argparse.Namespace) -> int:
     root = repository_root(Path(args.repo))
     config = load_config(root)
@@ -210,6 +238,7 @@ def validate_review(review: dict[str, object]) -> None:
         "base",
         "candidate_commit",
         "candidate_tree",
+        "acceptance_criteria",
         "acceptance_criteria_sha256",
         "quality_policy_sha256",
         "ready",
@@ -274,6 +303,61 @@ def validate_evidence(
         ):
             raise LifecycleError("Readiness evidence contains a failed or skipped check")
     return review
+
+
+def validate_architecture_review(
+    directory: Path, expected: dict[str, object]
+) -> dict[str, object]:
+    path = directory / "architecture-review.json"
+    record = read_json(path)
+    required = (
+        "schema",
+        "repository",
+        "branch",
+        "base",
+        "candidate_commit",
+        "candidate_tree",
+        "acceptance_criteria",
+        "acceptance_criteria_sha256",
+        "quality_policy_sha256",
+        "decision",
+        "reviewer",
+        "reviewed_at",
+        "evidence",
+        "evidence_sha256",
+    )
+    missing = [key for key in required if key not in record]
+    if missing:
+        raise LifecycleError(
+            "Invalid architectural review; missing fields: " + ", ".join(missing)
+        )
+    if type(record["schema"]) is not int or record["schema"] != 1:
+        raise LifecycleError("Unsupported architectural review schema")
+    if record["decision"] != "accepted":
+        raise LifecycleError("Architectural review has not accepted this candidate")
+    if not isinstance(record["reviewer"], str) or not record["reviewer"].strip():
+        raise LifecycleError("Architectural review reviewer is malformed")
+    if not isinstance(record["evidence"], str) or not record["evidence"].strip():
+        raise LifecycleError("Architectural review evidence is empty")
+    if record["evidence_sha256"] != sha256_bytes(
+        record["evidence"].encode("utf-8")
+    ):
+        raise LifecycleError("Architectural review evidence hash does not match")
+    reviewed_at = record["reviewed_at"]
+    if not isinstance(reviewed_at, str):
+        raise LifecycleError("Architectural review time is malformed")
+    try:
+        timestamp = datetime.fromisoformat(reviewed_at)
+        if timestamp.tzinfo is None:
+            raise ValueError("timezone missing")
+    except ValueError as error:
+        raise LifecycleError("Architectural review time is malformed") from error
+    for key, value in expected.items():
+        if record.get(key) != value:
+            raise LifecycleError(
+                f"Architectural review does not match current {key}"
+            )
+    return record
 
 
 def cmd_review(args: argparse.Namespace) -> int:
@@ -363,6 +447,57 @@ def cmd_review(args: argparse.Namespace) -> int:
     return 0 if not failed else 1
 
 
+def cmd_architecture_review(args: argparse.Namespace) -> int:
+    root = repository_root(Path(args.repo))
+    config = load_config(root)
+    branch = feature_branch(root, config.feature_prefix, args.feature)
+    ensure_no_git_operation(root)
+    ensure_clean(root)
+    candidate = head_commit(root)
+    tree = candidate_tree(root)
+    criteria, criteria_hash = read_criteria(args)
+    policy_hash = sha256_bytes(config.policy_bytes())
+    directory = storage(root, branch)
+    expected: dict[str, object] = {
+        "repository": str(root),
+        "branch": branch,
+        "base": config.base,
+        "candidate_commit": candidate,
+        "candidate_tree": tree,
+        "acceptance_criteria_sha256": criteria_hash,
+        "acceptance_criteria": criteria,
+        "quality_policy_sha256": policy_hash,
+    }
+    validate_evidence(config, directory, expected)
+    reviewer = args.reviewer.strip()
+    evidence = args.evidence.strip()
+    if not reviewer:
+        raise LifecycleError("Architectural review reviewer may not be empty")
+    if not evidence:
+        raise LifecycleError("Architectural review evidence may not be empty")
+    record = {
+        **expected,
+        "schema": 1,
+        "decision": args.decision,
+        "reviewer": reviewer,
+        "reviewed_at": datetime.now(timezone.utc).isoformat(),
+        "evidence": evidence,
+        "evidence_sha256": sha256_bytes(evidence.encode("utf-8")),
+    }
+    review_hash = write_json(directory / "architecture-review.json", record)
+    print(
+        json_text(
+            {
+                "candidate_commit": candidate,
+                "candidate_tree": tree,
+                "decision": args.decision,
+                "architectural_review_sha256": review_hash,
+            }
+        )
+    )
+    return 0
+
+
 def validate_approval_record(record: dict[str, object]) -> None:
     required = (
         "schema",
@@ -374,22 +509,29 @@ def validate_approval_record(record: dict[str, object]) -> None:
         "base",
         "candidate_commit",
         "candidate_tree",
+        "acceptance_criteria",
         "acceptance_criteria_sha256",
         "quality_policy_sha256",
         "review_packet_sha256",
         "evidence_sha256",
+        "architectural_review_sha256",
     )
     missing = [key for key in required if key not in record]
     if missing:
         raise LifecycleError(
             "Invalid approval record; missing fields: " + ", ".join(missing)
         )
-    if type(record["schema"]) is not int or record["schema"] != 1:
+    if type(record["schema"]) is not int or record["schema"] != 2:
         raise LifecycleError("Unsupported approval record schema")
     if record["approved"] is not True:
         raise LifecycleError("Approval record is not approved")
     if record["message"] != "APPROVED":
         raise LifecycleError("Approval record message is not APPROVED")
+    criteria = record["acceptance_criteria"]
+    if not isinstance(criteria, list) or not criteria or not all(
+        isinstance(item, str) and item.strip() for item in criteria
+    ):
+        raise LifecycleError("Invalid approval record; acceptance criteria are malformed")
     string_fields = (
         "approved_at",
         "repository",
@@ -401,6 +543,7 @@ def validate_approval_record(record: dict[str, object]) -> None:
         "quality_policy_sha256",
         "review_packet_sha256",
         "evidence_sha256",
+        "architectural_review_sha256",
     )
     if any(not isinstance(record[field], str) for field in string_fields):
         raise LifecycleError("Invalid approval record; string fields are malformed")
@@ -420,6 +563,7 @@ def validate_approval_record(record: dict[str, object]) -> None:
         "quality_policy_sha256",
         "review_packet_sha256",
         "evidence_sha256",
+        "architectural_review_sha256",
     )
     import re
 
@@ -451,17 +595,21 @@ def cmd_approve(args: argparse.Namespace) -> int:
         "base": config.base,
         "candidate_commit": candidate,
         "candidate_tree": tree,
-        "acceptance_criteria_sha256": criteria_hash,
         "acceptance_criteria": criteria,
+        "acceptance_criteria_sha256": criteria_hash,
         "quality_policy_sha256": policy_hash,
     }
     validate_evidence(config, directory, expected)
+    validate_architecture_review(directory, expected)
     ensure_clean(root)
 
     review_bytes = (directory / "review.json").read_bytes()
     evidence_bytes = (directory / "evidence.json").read_bytes()
+    architecture_review_bytes = (
+        directory / "architecture-review.json"
+    ).read_bytes()
     record = {
-        "schema": 1,
+        "schema": 2,
         "approved": True,
         "approved_at": datetime.now(timezone.utc).isoformat(),
         "message": "APPROVED",
@@ -470,10 +618,14 @@ def cmd_approve(args: argparse.Namespace) -> int:
         "base": config.base,
         "candidate_commit": candidate,
         "candidate_tree": tree,
+        "acceptance_criteria": criteria,
         "acceptance_criteria_sha256": criteria_hash,
         "quality_policy_sha256": policy_hash,
         "review_packet_sha256": sha256_bytes(review_bytes),
         "evidence_sha256": sha256_bytes(evidence_bytes),
+        "architectural_review_sha256": sha256_bytes(
+            architecture_review_bytes
+        ),
     }
     approval_hash = write_json(directory / "approval.json", record)
     print(
@@ -522,6 +674,7 @@ def cmd_status(args: argparse.Namespace) -> int:
             "base": config.base,
             "candidate_commit": candidate,
             "candidate_tree": tree,
+            "acceptance_criteria": criteria,
             "acceptance_criteria_sha256": criteria_hash,
             "quality_policy_sha256": sha256_bytes(config.policy_bytes()),
         }
@@ -533,6 +686,16 @@ def cmd_status(args: argparse.Namespace) -> int:
         if dirty:
             raise LifecycleError("worktree is dirty")
         validate_evidence(config, directory, {**expected, "acceptance_criteria": criteria})
+        validate_architecture_review(
+            directory, {**expected, "acceptance_criteria": criteria}
+        )
+        architecture_review_hash = sha256_bytes(
+            (directory / "architecture-review.json").read_bytes()
+        )
+        if record.get("architectural_review_sha256") != architecture_review_hash:
+            raise LifecycleError(
+                "Approval does not match current architectural review"
+            )
     except (LifecycleError, GitError, OSError, UnicodeError) as error:
         reasons.append(str(error))
 
@@ -595,6 +758,24 @@ def build_parser() -> argparse.ArgumentParser:
     criteria.add_argument("--criteria")
     criteria.add_argument("--criteria-file")
     status.set_defaults(handler=cmd_status)
+
+    continue_feature = sub.add_parser("continue")
+    continue_feature.add_argument("--repo", default=".")
+    continue_feature.add_argument("--feature", required=True)
+    continue_feature.set_defaults(handler=cmd_continue)
+
+    architecture_review = sub.add_parser("architecture-review")
+    architecture_review.add_argument("--repo", default=".")
+    architecture_review.add_argument("--feature", required=True)
+    criteria = architecture_review.add_mutually_exclusive_group(required=True)
+    criteria.add_argument("--criteria")
+    criteria.add_argument("--criteria-file")
+    architecture_review.add_argument(
+        "--decision", choices=("accepted", "changes-requested"), required=True
+    )
+    architecture_review.add_argument("--reviewer", required=True)
+    architecture_review.add_argument("--evidence", required=True)
+    architecture_review.set_defaults(handler=cmd_architecture_review)
 
     for name in ("integrate", "resume"):
         command = sub.add_parser(name)

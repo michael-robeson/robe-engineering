@@ -12,7 +12,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from eng_lifecycle.cli import main
+from eng_lifecycle.cli import main, storage
 from eng_lifecycle.config import load_config
 from eng_lifecycle.evidence import sha256_bytes
 from eng_lifecycle.gitops import git_dir
@@ -109,6 +109,29 @@ class LifecycleTest(unittest.TestCase):
         return result, path
 
     def approve(self, criteria: Path, message: str = "APPROVED") -> int:
+        architecture_review = (
+            storage(self.repo, self.feature) / "architecture-review.json"
+        )
+        if not architecture_review.is_file():
+            review_result = main(
+                [
+                    "architecture-review",
+                    "--repo",
+                    str(self.repo),
+                    "--feature",
+                    self.feature,
+                    "--criteria-file",
+                    str(criteria),
+                    "--decision",
+                    "accepted",
+                    "--reviewer",
+                    "Lifecycle Test",
+                    "--evidence",
+                    "Reviewed candidate architecture and recorded findings.",
+                ]
+            )
+            if review_result != 0:
+                return review_result
         return main(
             [
                 "approve",
@@ -121,6 +144,186 @@ class LifecycleTest(unittest.TestCase):
                 "--message",
                 message,
             ]
+        )
+
+    def test_continue_reports_and_preserves_feature_owned_changes(self) -> None:
+        self.assertEqual(self.start(), 0)
+        path = self.repo / "feature.txt"
+        path.write_text("pending feature work\n", encoding="utf-8")
+        before = path.read_text(encoding="utf-8")
+        output = io.StringIO()
+        with redirect_stdout(output):
+            result = main(
+                [
+                    "continue",
+                    "--repo",
+                    str(self.repo),
+                    "--feature",
+                    self.feature,
+                ]
+            )
+        report = json.loads(output.getvalue())
+
+        self.assertEqual(result, 0)
+        self.assertFalse(report["worktree_clean"])
+        self.assertFalse(report["ownership_verified"])
+        self.assertTrue(any("feature.txt" in change for change in report["changes"]))
+        self.assertEqual(path.read_text(encoding="utf-8"), before)
+
+    def test_continue_requires_the_existing_current_feature_branch(self) -> None:
+        self.assertEqual(self.start(), 0)
+        run("git", "switch", "develop", cwd=self.repo)
+        self.assertEqual(
+            main(
+                [
+                    "continue",
+                    "--repo",
+                    str(self.repo),
+                    "--feature",
+                    self.feature,
+                ]
+            ),
+            2,
+        )
+
+    def test_approval_requires_candidate_bound_architectural_review(self) -> None:
+        self.assertEqual(self.start(), 0)
+        self.assertEqual(self.commit(), 0)
+        _, criteria = self.review()
+        self.assertEqual(
+            main(
+                [
+                    "approve",
+                    "--repo",
+                    str(self.repo),
+                    "--feature",
+                    self.feature,
+                    "--criteria-file",
+                    str(criteria),
+                    "--message",
+                    "APPROVED",
+                ]
+            ),
+            2,
+        )
+        self.assertFalse(
+            list(
+                (git_dir(self.repo) / "engineering-lifecycle").rglob(
+                    "approval.json"
+                )
+            )
+        )
+
+    def test_changes_requested_architectural_review_blocks_approval(self) -> None:
+        self.assertEqual(self.start(), 0)
+        self.assertEqual(self.commit(), 0)
+        _, criteria = self.review()
+        self.assertEqual(
+            main(
+                [
+                    "architecture-review",
+                    "--repo",
+                    str(self.repo),
+                    "--feature",
+                    self.feature,
+                    "--criteria-file",
+                    str(criteria),
+                    "--decision",
+                    "changes-requested",
+                    "--reviewer",
+                    "Lifecycle Test",
+                    "--evidence",
+                    "The candidate requires a follow-up change.",
+                ]
+            ),
+            0,
+        )
+        self.assertEqual(
+            main(
+                [
+                    "approve",
+                    "--repo",
+                    str(self.repo),
+                    "--feature",
+                    self.feature,
+                    "--criteria-file",
+                    str(criteria),
+                    "--message",
+                    "APPROVED",
+                ]
+            ),
+            2,
+        )
+
+    def test_architectural_review_is_stale_after_candidate_change(self) -> None:
+        self.assertEqual(self.start(), 0)
+        self.assertEqual(self.commit(), 0)
+        _, criteria = self.review()
+        self.assertEqual(
+            main(
+                [
+                    "architecture-review",
+                    "--repo",
+                    str(self.repo),
+                    "--feature",
+                    self.feature,
+                    "--criteria-file",
+                    str(criteria),
+                    "--decision",
+                    "accepted",
+                    "--reviewer",
+                    "Lifecycle Test",
+                    "--evidence",
+                    "Reviewed the first candidate.",
+                ]
+            ),
+            0,
+        )
+        (self.repo / "feature.txt").write_text("revised\n", encoding="utf-8")
+        run("git", "add", "feature.txt", cwd=self.repo)
+        run("git", "commit", "-m", "Revise candidate", cwd=self.repo)
+        self.assertEqual(self.review()[0], 0)
+        self.assertEqual(
+            main(
+                [
+                    "approve",
+                    "--repo",
+                    str(self.repo),
+                    "--feature",
+                    self.feature,
+                    "--criteria-file",
+                    str(criteria),
+                    "--message",
+                    "APPROVED",
+                ]
+            ),
+            2,
+        )
+
+    def test_tampered_architectural_review_invalidates_approval(self) -> None:
+        self.assertEqual(self.start(), 0)
+        self.assertEqual(self.commit(), 0)
+        _, criteria = self.review()
+        self.assertEqual(self.approve(criteria), 0)
+        architecture_review = (
+            storage(self.repo, self.feature) / "architecture-review.json"
+        )
+        record = json.loads(architecture_review.read_text(encoding="utf-8"))
+        record["evidence"] = "Changed after approval."
+        architecture_review.write_text(json.dumps(record), encoding="utf-8")
+        self.assertEqual(
+            main(
+                [
+                    "status",
+                    "--repo",
+                    str(self.repo),
+                    "--feature",
+                    self.feature,
+                    "--criteria-file",
+                    str(criteria),
+                ]
+            ),
+            1,
         )
 
     def test_normal_operation(self) -> None:
@@ -281,7 +484,22 @@ class LifecycleTest(unittest.TestCase):
         self.change_policy_only(criteria)
         error = io.StringIO()
         with redirect_stderr(error):
-            self.assertEqual(self.approve(criteria), 2)
+            self.assertEqual(
+                main(
+                    [
+                        "approve",
+                        "--repo",
+                        str(self.repo),
+                        "--feature",
+                        self.feature,
+                        "--criteria-file",
+                        str(criteria),
+                        "--message",
+                        "APPROVED",
+                    ]
+                ),
+                2,
+            )
         self.assertIn("quality policy changed", error.getvalue())
         self.assertEqual((directory / "evidence.json").read_bytes(), evidence)
         self.assertEqual((directory / "review.json").read_bytes(), review)
@@ -410,6 +628,21 @@ class LifecycleTest(unittest.TestCase):
         criteria.write_text("Linked worktree criterion\n", encoding="utf-8")
         common_args = ["--repo", str(worktree), "--feature", "linked", "--criteria-file", str(criteria)]
         self.assertEqual(main(["review", *common_args]), 0)
+        self.assertEqual(
+            main(
+                [
+                    "architecture-review",
+                    *common_args,
+                    "--decision",
+                    "accepted",
+                    "--reviewer",
+                    "Lifecycle Test",
+                    "--evidence",
+                    "Reviewed the linked-worktree candidate.",
+                ]
+            ),
+            0,
+        )
         self.assertEqual(main(["approve", *common_args, "--message", "APPROVED"]), 0)
         self.assertEqual(main(["status", *common_args]), 0)
         self.assertTrue(list((actual / "engineering-lifecycle").rglob("approval.json")))

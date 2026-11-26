@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from eng_lifecycle.cli import main
 from eng_lifecycle.config import LifecycleError
-from eng_lifecycle.gitops import run_git
+from eng_lifecycle.gitops import git_dir, run_git
 from eng_lifecycle.integration import integration_lock, required_checks
 
 
@@ -161,6 +161,21 @@ class IntegrationTest(unittest.TestCase):
         self.temp.cleanup()
 
     def approve(self) -> None:
+        self.assertEqual(
+            main(
+                [
+                    "architecture-review",
+                    *self.args,
+                    "--decision",
+                    "accepted",
+                    "--reviewer",
+                    "Integration Test",
+                    "--evidence",
+                    "Reviewed the candidate architecture and recorded findings.",
+                ]
+            ),
+            0,
+        )
         self.assertEqual(main(["approve", *self.args, "--message", "APPROVED"]), 0)
 
     def update_policy(self, **changes: object) -> None:
@@ -849,6 +864,24 @@ class IntegrationTest(unittest.TestCase):
         result, output = self.call()
         self.assertEqual(result, 2)
         self.assertIn("feature branch differs", output)
+        self.assertEqual(self.remote_feature(), "")
+
+    def test_tampered_architectural_review_blocks_integration(self) -> None:
+        self.approve()
+        architecture_review = next(
+            (git_dir(self.repo) / "engineering-lifecycle").rglob(
+                "architecture-review.json"
+            )
+        )
+        record = json.loads(architecture_review.read_text(encoding="utf-8"))
+        record["evidence"] = "Changed after approval."
+        architecture_review.write_text(json.dumps(record), encoding="utf-8")
+
+        result, output = self.call()
+
+        self.assertEqual(result, 2)
+        self.assertIn("evidence hash", output.lower())
+        self.assertEqual(self.fake.created, 0)
         self.assertEqual(self.remote_feature(), "")
 
 
