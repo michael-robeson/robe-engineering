@@ -156,9 +156,11 @@ eng-lifecycle start --repo .
 eng-lifecycle commit --repo . --message "Implement increment" --path src
 ```
 
-`start` prints the generated or reused branch. For later `review`, `approve`,
-`status`, `integrate`, and `resume` commands, pass that reported branch to
-`--feature`; no feature scope or branch name is chosen at startup.
+`start` initiates a feature and prints the generated or reused branch. For an
+already active feature, use `continue` with that branch; it never creates or
+switches branches. For later `commit`, `review`, `architecture-review`,
+`approve`, `status`, `integrate`, and `resume` commands, pass the feature
+branch to `--feature`.
 
 Install the repository pre-commit hook separately:
 
@@ -169,15 +171,23 @@ sh scripts/install-hooks.sh
 The CLI stores only review evidence and approval metadata under Git's
 actual git directory. It derives branch, commit, worktree, review, and
 candidate state from Git. Routine development uses the existing checkout;
-the CLI does not create linked worktrees. `start` reuses a clean generated
-local-only branch when one is already checked out. Otherwise, it requires a
-clean checkout of the configured base, fast-forwards it from `origin`, and
-creates a collision-resistant local-only branch automatically. A dirty
-checkout, unrelated branch, or local-ahead/divergent base blocks startup
-without stashing or switching to another directory or worktree. Scoped
-commits refuse an already populated index; installed Git hooks run normally.
-The supplied hook checks staged Python blobs, not unstaged working-tree
-contents.
+the CLI does not create linked worktrees. `start` is for new work: it reuses a
+clean generated local-only branch when one is checked out. Otherwise, it
+requires a clean checkout of the configured base, fast-forwards it from
+`origin`, and creates a collision-resistant local-only branch automatically.
+It never stashes or switches directories to bypass a dirty checkout or
+unrelated branch.
+
+`continue --repo . --feature <branch>` resumes work on the existing current
+feature branch, including with uncommitted changes. It reports the worktree
+changes without staging or modifying them. Establish that changes belong to
+the active feature before editing or committing; if ownership is uncertain,
+preserve the changes and ask only about that ambiguity. Use scoped commits and
+do not include unrelated paths. The CLI refuses a pre-populated index.
+Readiness review still requires a clean committed candidate, so unresolved
+unrelated work must be kept out of the candidate without stashing or resetting
+it. `resume` remains exclusively for recovering an interrupted
+post-approval integration.
 
 The repository's `.github/lifecycle.json` defines commands as shell-like
 strings or argument arrays, executed directly without a shell. Readiness
@@ -189,21 +199,44 @@ appropriate task-specific authorization. This flag and the repository's
 classification are workflow safeguards, not permission enforcement or a
 sandbox; commands can have effects beyond what their labels describe.
 
-Review requires a clean committed candidate and matching feature name. A
-failed or interrupted review cannot be approved. The exact `APPROVED`
-message must first be given by the user in Copilot Chat; the local record is
-not proof of identity. Approval and status require the same acceptance
-criteria and validate the current review, complete check evidence, candidate,
-and policy. A successful rerun with the same binding need not invalidate
-approval merely because timing or other incidental evidence changed.
-Policy drift is reported even when the changed policy file makes the worktree
-dirty; approval still requires a clean worktree.
+Readiness review requires a clean committed candidate and matching feature
+name. A failed or interrupted review cannot be approved. Perform the
+architectural review separately after readiness and record its outcome for the
+same candidate:
+
+```sh
+eng-lifecycle architecture-review --repo . --feature <branch> \
+  --criteria "Acceptance criteria" --decision accepted \
+  --reviewer "Reviewer" --evidence "Review findings and disposition"
+```
+
+An architectural decision of `changes-requested` cannot be approved. The
+architectural-review record, readiness evidence, and approval are bound to the
+candidate commit and tree, acceptance criteria, and quality policy. A new
+candidate therefore invalidates stale readiness, architectural-review, and
+approval evidence; rerun the gates for the changed candidate. A successful
+readiness rerun on the same candidate need not invalidate approval merely
+because timing or other incidental evidence changed. Policy drift is reported
+even when the changed policy file makes the worktree dirty; approval still
+requires a clean worktree.
+
+Architectural-review and approval records are local consistency metadata under
+Git's actual git directory, not cryptographic signatures or substitutes for
+configured GitHub protections.
+
+The exact `APPROVED` message must first be given by the user in Copilot Chat
+for that reviewed candidate; task authorization for implementation or
+verification does not imply integration approval. Routine authorized
+implementation, verification, scoped commits, and lifecycle commands do not
+need repeated confirmation. Use `--authorize <category>` for a special check
+only when its effects are not already authorized for the task; this flag is a
+workflow safeguard, not permission enforcement or a sandbox.
 
 ### Post-approval integration
 
 Only run `integrate` or `resume` after explicit user approval of that exact
-candidate. They validate the existing approval and evidence, run readiness
-and integration checks, push the approved commit, create or update its PR,
+candidate. They validate the readiness, architectural-review, and approval
+evidence, run readiness and integration checks, push the approved commit, create or update its PR,
 wait up to ten minutes for required CI, and check review threads and merge
 eligibility. They merge only with a matching PR head, then synchronize the
 local base and safely delete the merged feature branch. After cleanup, the CLI
