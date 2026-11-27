@@ -29,6 +29,7 @@ from .gitops import (
     repository_root,
     run_git,
 )
+from .metadata import prepare_index
 
 
 def branch_name(feature: str, prefix: str) -> str:
@@ -159,6 +160,7 @@ def cmd_commit(args: argparse.Namespace) -> int:
     if existing.returncode != 0:
         raise LifecycleError("Refusing scoped commit with existing staged changes")
     run_git(root, ["add", "--", *args.paths], check=True)
+    prepare_index(root)
     staged = run_git(root, ["diff", "--cached", "--quiet"], check=False)
     if staged.returncode == 0:
         raise LifecycleError("No staged changes to commit")
