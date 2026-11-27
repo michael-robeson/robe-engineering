@@ -657,6 +657,61 @@ class LifecycleTest(unittest.TestCase):
         self.assertEqual(run("git", "rev-parse", "HEAD", cwd=self.repo).stdout, before)
         self.assertEqual(run("git", "write-tree", cwd=self.repo).stdout, index)
 
+    def test_scoped_commit_prepares_metadata_from_staged_inputs(self) -> None:
+        self.assertEqual(self.start(), 0)
+        metadata = self.repo / ".github" / "repository-metadata.json"
+        metadata.write_text(json.dumps({
+            "schema": 1,
+            "badges": [{
+                "adapter": "python-requires",
+                "source": "pyproject.toml",
+                "output": ".github/badges/python.json",
+            }],
+        }), encoding="utf-8")
+        manifest = self.repo / "pyproject.toml"
+        manifest.write_text('[project]\nrequires-python = ">=3.12"\n', encoding="utf-8")
+        args = ["commit", "--repo", str(self.repo), "--message", "Add metadata"]
+        self.assertEqual(main([*args, "--path", ".github", "--path", "pyproject.toml"]), 0)
+        output = self.repo / ".github/badges/python.json"
+        self.assertEqual(json.loads(output.read_text(encoding="utf-8"))["message"], ">=3.12")
+
+        manifest.write_text('[project]\nrequires-python = ">=3.13"\n', encoding="utf-8")
+        (self.repo / "unrelated.txt").write_text("leave unstaged\n", encoding="utf-8")
+        self.assertEqual(main([*args, "--path", "pyproject.toml"]), 0)
+        committed = run("git", "show", "HEAD:.github/badges/python.json", cwd=self.repo).stdout
+        self.assertEqual(json.loads(committed)["message"], ">=3.13")
+        self.assertIn("?? unrelated.txt", run("git", "status", "--short", cwd=self.repo).stdout)
+
+        manifest.write_text('[project]\nrequires-python = ">=3.14"\n', encoding="utf-8")
+        (self.repo / "feature.txt").write_text("separate change\n", encoding="utf-8")
+        self.assertEqual(main([*args, "--path", "feature.txt"]), 0)
+        committed = run("git", "show", "HEAD:.github/badges/python.json", cwd=self.repo).stdout
+        self.assertEqual(json.loads(committed)["message"], ">=3.13")
+        self.assertEqual(manifest.read_text(encoding="utf-8"), '[project]\nrequires-python = ">=3.14"\n')
+
+    def test_metadata_preparation_preserves_conflicting_output(self) -> None:
+        self.assertEqual(self.start(), 0)
+        metadata = self.repo / ".github" / "repository-metadata.json"
+        metadata.write_text(json.dumps({
+            "schema": 1,
+            "badges": [{
+                "adapter": "python-requires",
+                "source": "pyproject.toml",
+                "output": ".github/badges/python.json",
+            }],
+        }), encoding="utf-8")
+        manifest = self.repo / "pyproject.toml"
+        manifest.write_text('[project]\nrequires-python = ">=3.12"\n', encoding="utf-8")
+        args = ["commit", "--repo", str(self.repo), "--message", "Metadata"]
+        self.assertEqual(main([*args, "--path", ".github", "--path", "pyproject.toml"]), 0)
+        output = self.repo / ".github/badges/python.json"
+        output.write_text("custom change\n", encoding="utf-8")
+        manifest.write_text('[project]\nrequires-python = ">=3.13"\n', encoding="utf-8")
+        before = run("git", "rev-parse", "HEAD", cwd=self.repo).stdout
+        self.assertEqual(main([*args, "--path", "pyproject.toml"]), 2)
+        self.assertEqual(output.read_text(encoding="utf-8"), "custom change\n")
+        self.assertEqual(run("git", "rev-parse", "HEAD", cwd=self.repo).stdout, before)
+
     def test_hook_validates_staged_blobs_not_worktree(self) -> None:
         self.assertEqual(self.start(), 0)
         hook = Path(__file__).resolve().parents[1] / ".githooks" / "check-staged.py"

@@ -1,5 +1,12 @@
 # Robe Engineering Capability Catalog
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![PR CI](https://github.com/robe-land/robe-engineer/actions/workflows/verify.yml/badge.svg?event=pull_request)](https://github.com/robe-land/robe-engineer/actions/workflows/verify.yml)
+[![Declared Python requirement](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Frobe-land%2Frobe-engineer%2Fdevelop%2F.github%2Fbadges%2Fpython.json)](pyproject.toml)
+[![Top language](https://img.shields.io/github/languages/top/robe-land/robe-engineer)](https://github.com/robe-land/robe-engineer)
+[![Language count](https://img.shields.io/github/languages/count/robe-land/robe-engineer)](https://github.com/robe-land/robe-engineer)
+[![Last commit](https://img.shields.io/github/last-commit/robe-land/robe-engineer/develop)](https://github.com/robe-land/robe-engineer/commits/develop)
+
 A private, personal inventory of reusable Copilot skills, agents, and
 instructions. The catalog describes capabilities; it does not install them,
 grant permissions, or replace their owning instructions.
@@ -150,6 +157,48 @@ Run the required local checks from the repository root:
 The entry point compiles the Python sources and runs the unit suite. The
 lifecycle readiness gate invokes it; verification alone does not record
 approval or authorize integration.
+
+### Opt-in repository metadata
+
+Repositories may opt in to deterministic badge metadata with
+`.github/repository-metadata.json`. Schema 1 currently supports the
+`python-requires` adapter: `source` names a repository-relative PEP 621
+manifest and `output` names a distinct repository-relative Shields endpoint
+JSON file. See this repository's
+[configuration](.github/repository-metadata.json) and
+[generated output](.github/badges/python.json). The badge displays the
+complete `project.requires-python` declaration, not a tested-version claim.
+Unknown adapters and invalid or unsafe paths are rejected.
+
+Pin the shared CLI to a reviewed, immutable Engineering commit when adopting
+it in another repository, including in CI. Install that same pinned version
+for lifecycle candidate preparation and metadata checks; do not rely on an
+unpinned checkout or a floating package version. Each repository owns its
+configuration, badge URL, check wiring, and decision to adopt.
+
+`eng-lifecycle commit` generates configured outputs from the **staged**
+configuration and source files after staging the requested paths. It adds
+those outputs to the candidate before commit checks. Unstaged source changes
+are not included. It refuses to overwrite a modified output that differs
+from both the committed and generated contents. Commit the configuration and
+its input paths together when first opting in. If preparation fails after
+staging, inspect the index and resolve the problem without discarding changes.
+
+For manual preparation, `eng-metadata generate --repo .` uses working-tree
+inputs and applies the same overwrite protection; it does not stage files.
+`eng-metadata check --repo .` only checks for drift and never regenerates.
+Configure that check in the repository's existing readiness and CI commands.
+This repository runs it in `./scripts/verify`; neither check reruns tests.
+Generate before committing and before candidate review or approval; never
+rewrite approved candidates as part of verification or integration.
+
+The endpoint badge reads the generated file from the configured public
+branch through Shields.io; its display may be cached and does not describe
+unmerged changes. Private repositories need an endpoint accessible to the
+badge service or should omit that badge. Test-result and coverage adapters
+are not implemented; do not use static counts as a substitute.
+The PR CI badge reports a pull-request workflow run, not necessarily
+verification of the current `develop` commit.
 
 ```sh
 eng-lifecycle start --repo .
